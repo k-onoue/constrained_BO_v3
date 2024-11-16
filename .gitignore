@@ -9,3 +9,4 @@ retrieve*.sh
 send*.sh
 images/
 temp/
+optuna/
