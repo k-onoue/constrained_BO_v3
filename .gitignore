@@ -1,0 +1,10 @@
+.DS_Store/
+bo-env_v3/
+data/
+__pycache__/
+results*/
+logs/
+logs-archive/
+retrieve*.sh
+images/
+temp/
