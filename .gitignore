@@ -6,5 +6,6 @@ results*/
 logs/
 logs-archive/
 retrieve*.sh
+send*.sh
 images/
 temp/

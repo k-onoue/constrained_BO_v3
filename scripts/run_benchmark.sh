@@ -29,14 +29,18 @@ run() {
 # Main script
 timestamp=$(date +"%Y-%m-%d_%H-%M-%S")
 
+iter_bo=500
+
 sampler_list=("tpe" "random" "gp" "hgp")
 seed_list=(0 1 2 3 4 5 6 7 8 9)
-iter_bo=20
+functions=("sphere" "ackley" "warcraft")
+dimensions=(2 3 4 5 6 7)
+map_options=(1 2 3)
 
-for function in "sphere" "ackley" "warcraft"; do
+for function in "${functions[@]}"; do
     case $function in
         "sphere" | "ackley")
-            for dimension in 2 3 4 5 6 7; do
+            for dimension in "${dimensions[@]}"; do
                 for sampler in "${sampler_list[@]}"; do
                     for seed in "${seed_list[@]}"; do
                         run "$function" "$timestamp" "$sampler" "$dimension" "$iter_bo" "$seed" 1
@@ -47,7 +51,7 @@ for function in "sphere" "ackley" "warcraft"; do
             done
             ;;
         "warcraft")
-            for map_option in 1 2 3; do
+            for map_option in "${map_options[@]}"; do
                 for sampler in "${sampler_list[@]}"; do
                     for seed in "${seed_list[@]}"; do
                         run "$function" "$timestamp" "$sampler" 2 "$iter_bo" "$seed" "$map_option"
