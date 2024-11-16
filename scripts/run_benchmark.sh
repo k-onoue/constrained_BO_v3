@@ -22,6 +22,7 @@ run() {
         --iter_bo "$iter_bo"
         --seed "$seed"
         --map_option "$map_option"
+        --n_startup_trials "$n_startup_trials"
     )
     "${cmd[@]}" &
 }
@@ -37,13 +38,15 @@ functions=("sphere" "ackley" "warcraft")
 dimensions=(2 3 4 5 6 7)
 map_options=(1 2 3)
 
+n_startup_trials=1
+
 for function in "${functions[@]}"; do
     case $function in
         "sphere" | "ackley")
             for dimension in "${dimensions[@]}"; do
                 for sampler in "${sampler_list[@]}"; do
                     for seed in "${seed_list[@]}"; do
-                        run "$function" "$timestamp" "$sampler" "$dimension" "$iter_bo" "$seed" 1
+                        run "$function" "$timestamp" "$sampler" "$dimension" "$iter_bo" "$seed" 1 "$n_startup_trials"
                     done
                 done
                 # Wait for all processes in the current dimension to complete
@@ -54,7 +57,7 @@ for function in "${functions[@]}"; do
             for map_option in "${map_options[@]}"; do
                 for sampler in "${sampler_list[@]}"; do
                     for seed in "${seed_list[@]}"; do
-                        run "$function" "$timestamp" "$sampler" 2 "$iter_bo" "$seed" "$map_option"
+                        run "$function" "$timestamp" "$sampler" 2 "$iter_bo" "$seed" "$map_option" "$n_startup_trials"
                     done
                 done
                 # Wait for all processes in the current map option to complete
