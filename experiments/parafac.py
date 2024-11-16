@@ -124,6 +124,7 @@ def parse_args():
     parser.add_argument("--cp_als_iterations", type=int, default=100, help="Number of ALS iterations for the CP decomposition.")
     parser.add_argument("--cp_mask_ratio", type=float, default=0.1, help="Mask ratio used in the CP decomposition.")
     parser.add_argument("--cp_random_dist_type", type=str, choices=["uniform", "normal"], default="uniform", help="Distribution type for random sampling.")
+    parser.add_argument("--decomp_num", type=int, default=5, help="Number of iterations for the decomposition process.")
     parser.add_argument("--unique_sampling", action="store_true", help="Whether to use unique sampling in the ParafacSampler.")
     parser.add_argument("--include_observed_points", action="store_true", help="Whether to include observed points for masking in the ParafacSampler.")
     parser.add_argument("--n_startup_trials", type=int, default=10, help="Number of initial trials for the optimization process.")
