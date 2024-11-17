@@ -75,7 +75,7 @@ acq_trade_off_param=1.0
 cp_rank=2
 cp_mask_ratio=0.1
 cp_random_dist_type="uniform"
-decomp_num=5
+decomp_num=50
 
 acq_batch_size=1
 acq_maximize=false
