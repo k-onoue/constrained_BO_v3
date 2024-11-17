@@ -68,24 +68,27 @@ mkdir -p "$results_dir"
 # Copy the script to the results directory
 cp "$0" "$results_dir"
 
-iter_bo=20
+iter_bo=500
 
 acq_trade_off_param=1.0
-acq_batch_size=10
-acq_maximize=false
+
 cp_rank=2
-cp_als_iterations=100
 cp_mask_ratio=0.1
 cp_random_dist_type="uniform"
 decomp_num=5
+
+acq_batch_size=1
+acq_maximize=false
+cp_als_iterations=100
 n_startup_trials=1
+
 unique_sampling=false
 include_observed_points=false
 
 functions=("sphere" "ackley" "warcraft")
-dimensions=(2 3 4 5 6 7)
+dimensions=(4 6)
 map_options=(1 2)
-seed_list=(0 1 2 3 4 5 6 7 8 9)
+seed_list=(0 1 2)
 
 for function in "${functions[@]}"; do
     case $function in
@@ -120,3 +123,7 @@ done
 
 # Final wait to ensure all background processes are complete
 wait
+
+# Create a completion file in the results directory
+completion_file="$results_dir/completion.txt"
+echo "All tasks completed at $(date)" > "$completion_file"

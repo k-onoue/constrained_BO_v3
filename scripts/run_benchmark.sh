@@ -37,13 +37,16 @@ mkdir -p "$results_dir"
 # Copy the script to the results directory
 cp "$0" "$results_dir"
 
-iter_bo=500
+iter_bo=100
 
-sampler_list=("tpe" "random" "gp" "hgp")
-seed_list=(0 1 2 3 4 5 6 7 8 9)
-functions=("sphere" "ackley" "warcraft")
-dimensions=(2 3 4 5 6 7)
-map_options=(1 2 3)
+# sampler_list=("tpe" "random" "gp" "hgp")
+sampler_list=("gp" "hgp")
+
+# functions=("sphere" "ackley" "warcraft")
+functions=("warcraft")
+dimensions=(4)
+map_options=(1 2)
+seed_list=(0 1 2)
 
 n_startup_trials=1
 
@@ -57,7 +60,7 @@ for function in "${functions[@]}"; do
                     done
                 done
                 # Wait for all processes in the current dimension to complete
-                wait
+                # wait
             done
             ;;
         "warcraft")
@@ -68,7 +71,7 @@ for function in "${functions[@]}"; do
                     done
                 done
                 # Wait for all processes in the current map option to complete
-                wait
+                # wait
             done
             ;;
     esac
@@ -76,3 +79,7 @@ done
 
 # Final wait to ensure all background processes are complete
 wait
+
+# Create a completion file in the results directory
+completion_file="$results_dir/completion.txt"
+echo "All tasks completed at $(date)" > "$completion_file"

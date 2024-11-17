@@ -120,3 +120,7 @@ done
 
 # Final wait to ensure all background processes are complete
 wait
+
+# Create a completion file in the results directory
+completion_file="$results_dir/completion.txt"
+echo "All tasks completed at $(date)" > "$completion_file"
