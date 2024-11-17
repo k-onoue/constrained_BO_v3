@@ -37,10 +37,10 @@ mkdir -p "$results_dir"
 # Copy the script to the results directory
 cp "$0" "$results_dir"
 
-iter_bo=100
+iter_bo=500
 
-# sampler_list=("tpe" "random" "gp" "hgp")
-sampler_list=("gp" "hgp")
+sampler_list=("tpe" "random" "gp" "hgp")
+# sampler_list=("gp" "hgp")
 
 # functions=("sphere" "ackley" "warcraft")
 functions=("warcraft")

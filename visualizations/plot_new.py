@@ -4,7 +4,7 @@ import optuna
 from optuna.visualization import plot_optimization_history
 
 # ベースディレクトリと共通部分を設定
-target_dir_name = "2024-11-17_10-59-42"
+target_dir_name = "2024-11-17_11-32-46"
 result_dir = "/Users/keisukeonoue/ws/constrained_BO_v3/results"
 base_dir = os.path.join(result_dir, target_dir_name)
 common_prefix = f"{target_dir_name}_"

@@ -85,10 +85,10 @@ n_startup_trials=1
 unique_sampling=false
 include_observed_points=false
 
-functions=("sphere" "ackley" "warcraft")
+functions=("warcraft")
 dimensions=(4 6)
 map_options=(1 2)
-seed_list=(0 1 2)
+seed_list=(0 1 2 3 4)
 
 for function in "${functions[@]}"; do
     case $function in
