@@ -22,6 +22,7 @@ run() {
     local n_startup_trials=${15}
     local unique_sampling=${16}
     local include_observed_points=${17}
+    local acquisition_function=${18}
 
     cmd=(
         python3 "$EXE_FILE"
@@ -38,6 +39,7 @@ run() {
         --cp_mask_ratio "$cp_mask_ratio"
         --cp_random_dist_type "$cp_random_dist_type"
         --n_startup_trials "$n_startup_trials"
+        --acquisition_function "$acquisition_function"
     )
 
     # Include --acq_maximize if true
@@ -68,27 +70,31 @@ mkdir -p "$results_dir"
 # Copy the script to the results directory
 cp "$0" "$results_dir"
 
-iter_bo=500
+iter_bo=2000
 
-acq_trade_off_param=1.0
 
-cp_rank=2
+cp_rank=3
 cp_mask_ratio=0.1
-cp_random_dist_type="uniform"
-decomp_num=50
+cp_random_dist_type="normal"
+decomp_num=10
 
+acquisition_function="ei"  # "ei" or "ucb"
+acq_trade_off_param=1.0
 acq_batch_size=1
 acq_maximize=false
 cp_als_iterations=100
+
 n_startup_trials=1
 
 unique_sampling=false
 include_observed_points=false
 
-functions=("warcraft")
+functions=("sphere" "ackley")
+# functions=("warcraft")
 dimensions=(4 6)
 map_options=(1 2)
-seed_list=(0 1 2 3 4)
+seed_list=(0 1 2)
+
 
 for function in "${functions[@]}"; do
     case $function in
@@ -99,10 +105,10 @@ for function in "${functions[@]}"; do
                         "$acq_trade_off_param" "$acq_batch_size" "$acq_maximize" \
                         "$cp_rank" "$cp_als_iterations" "$cp_mask_ratio" \
                         "$cp_random_dist_type" "$decomp_num" "$n_startup_trials" \
-                        "$unique_sampling" "$include_observed_points"
+                        "$unique_sampling" "$include_observed_points" "$acquisition_function"
                 done
                 # Wait for all processes in the current dimension to complete
-                wait
+                # wait
             done
             ;;
         "warcraft")
@@ -112,10 +118,10 @@ for function in "${functions[@]}"; do
                         "$acq_trade_off_param" "$acq_batch_size" "$acq_maximize" \
                         "$cp_rank" "$cp_als_iterations" "$cp_mask_ratio" \
                         "$cp_random_dist_type" "$decomp_num" "$n_startup_trials" \
-                        "$unique_sampling" "$include_observed_points"
+                        "$unique_sampling" "$include_observed_points" "$acquisition_function"
                 done
                 # Wait for all processes in the current map option to complete
-                wait
+                # wait
             done
             ;;
     esac

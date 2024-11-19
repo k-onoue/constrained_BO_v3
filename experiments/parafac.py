@@ -75,6 +75,7 @@ def run_bo(settings):
         cp_rank=settings["cp_settings"]["rank"],
         als_iter_num=settings["cp_settings"]["als_iterations"],
         mask_ratio=settings["cp_settings"]["mask_ratio"],
+        acquisition_function=settings["acqf_settings"]["acquisition_function"],
         trade_off_param=settings["acqf_settings"]["trade_off_param"],
         distribution_type=settings["cp_settings"]["random_dist_type"],
         seed=settings["seed"],
@@ -128,6 +129,7 @@ def parse_args():
     parser.add_argument("--unique_sampling", action="store_true", help="Whether to use unique sampling in the ParafacSampler.")
     parser.add_argument("--include_observed_points", action="store_true", help="Whether to include observed points for masking in the ParafacSampler.")
     parser.add_argument("--n_startup_trials", type=int, default=10, help="Number of initial trials for the optimization process.")
+    parser.add_argument("--acquisition_function", type=str, choices=["ucb", "ei"], default="ucb", help="Acquisition function to use.")
     return parser.parse_args()
 
 
@@ -183,6 +185,7 @@ if __name__ == "__main__":
             "include_observed_points": args.include_observed_points,
         },
         "acqf_settings": {
+            "acquisition_function": args.acquisition_function,
             "trade_off_param": args.acq_trade_off_param,
             "batch_size": args.acq_batch_size,
             "maximize": args.acq_maximize,
