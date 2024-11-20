@@ -333,22 +333,22 @@ class ParafacSampler(BaseSampler):
         batch_size: int,
         maximize: bool,
     ) -> list[tuple[int, ...]]:
-        # Calculate overall mean and std stats for logging
-        mean_stats = {
-            "Max": np.max(mean_tensor),
-            "Min": np.min(mean_tensor),
-            "Mean": np.mean(mean_tensor),
-            "Std": np.std(mean_tensor),
-        }
-        std_stats = {
-            "Max": np.max(std_tensor),
-            "Min": np.min(std_tensor),
-            "Mean": np.mean(std_tensor),
-            "Std": np.std(std_tensor),
-        }
+        # # Calculate overall mean and std stats for logging
+        # mean_stats = {
+        #     "Max": np.max(mean_tensor),
+        #     "Min": np.min(mean_tensor),
+        #     "Mean": np.mean(mean_tensor),
+        #     "Std": np.std(mean_tensor),
+        # }
+        # std_stats = {
+        #     "Max": np.max(std_tensor),
+        #     "Min": np.min(std_tensor),
+        #     "Mean": np.mean(std_tensor),
+        #     "Std": np.std(std_tensor),
+        # }
 
-        logging.info(f"Candidate Mean Stats: {mean_stats}")
-        logging.info(f"Candidate Std Stats: {std_stats}")
+        # logging.info(f"Candidate Mean Stats: {mean_stats}")
+        # logging.info(f"Candidate Std Stats: {std_stats}")
 
         # Define UCB calculation
         def _ucb(mean_tensor, std_tensor, trade_off_param, maximize=True) -> np.ndarray:
@@ -375,22 +375,22 @@ class ParafacSampler(BaseSampler):
         batch_size: int,
         maximize: bool,
     ) -> list[tuple[int, ...]]:
-        # Calculate overall mean and std stats for logging
-        mean_stats = {
-            "Max": np.max(mean_tensor),
-            "Min": np.min(mean_tensor),
-            "Mean": np.mean(mean_tensor),
-            "Std": np.std(mean_tensor),
-        }
-        std_stats = {
-            "Max": np.max(std_tensor),
-            "Min": np.min(std_tensor),
-            "Mean": np.mean(std_tensor),
-            "Std": np.std(std_tensor),
-        }
+        # # Calculate overall mean and std stats for logging
+        # mean_stats = {
+        #     "Max": np.max(mean_tensor),
+        #     "Min": np.min(mean_tensor),
+        #     "Mean": np.mean(mean_tensor),
+        #     "Std": np.std(mean_tensor),
+        # }
+        # std_stats = {
+        #     "Max": np.max(std_tensor),
+        #     "Min": np.min(std_tensor),
+        #     "Mean": np.mean(std_tensor),
+        #     "Std": np.std(std_tensor),
+        # }
 
-        logging.info(f"Candidate Mean Stats: {mean_stats}")
-        logging.info(f"Candidate Std Stats: {std_stats}")
+        # logging.info(f"Candidate Mean Stats: {mean_stats}")
+        # logging.info(f"Candidate Std Stats: {std_stats}")
 
         # Define EI calculation
         def _ei(mean_tensor, std_tensor, f_best, maximize=True) -> np.ndarray:
