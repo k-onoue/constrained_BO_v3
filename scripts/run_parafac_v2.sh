@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # File to execute
-EXE_FILE="experiments/parafac.py"
+EXE_FILE="experiments/parafac_v2.py"
 
 # Function to run the experiment
 run() {

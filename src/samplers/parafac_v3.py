@@ -14,28 +14,26 @@ from tensorly.decomposition import parafac
 class ParafacSampler(BaseSampler):
     def __init__(
         self,
-        seed: Optional[int] = None,
         cp_rank: int = 3,
         als_iter_num: int = 10,
         mask_ratio: float = 0.2,
         trade_off_param: float = 1.0,
+        distribution_type: Literal["normal", "uniform"] = "normal",
+        seed: Optional[int] = None,
         unique_sampling: bool = False,
         decomp_iter_num: int = 5,
-        include_observed_points: bool = False,
+        include_observed_points: bool = True,
         acquisition_function: Literal["ucb", "ei"] = "ucb",  # 追加: 獲得関数の選択
-        n_startup_trials: int = 1,
+        n_startup_trials: int = 10,
         independent_sampler: Literal["random"] = "random",  # Remove qmc option
     ):
-        # Random seed
-        self.seed = seed
-        self.rng = np.random.RandomState(seed)
-        random.seed(seed)  # Ensure the global random seed is set
-
         # Initialization
         self.cp_rank = cp_rank
         self.als_iter_num = als_iter_num
         self.mask_ratio = mask_ratio
         self.trade_off_param = trade_off_param
+        self.distribution_type = distribution_type
+        self.rng = np.random.RandomState(seed)
         self.unique_sampling = unique_sampling
         self.decomp_iter_num = decomp_iter_num
         self.include_observed_points = include_observed_points
@@ -80,7 +78,7 @@ class ParafacSampler(BaseSampler):
         states = (TrialState.COMPLETE,)
         trials = study._get_trials(deepcopy=False, states=states, use_cache=True)
         
-        if len(trials) < self.n_startup_trials:  # Corrected attribute name
+        if len(trials) < self._n_startup_trials:
             return {}
 
         if self._param_names is None:
@@ -93,6 +91,8 @@ class ParafacSampler(BaseSampler):
         mean_tensor, std_tensor = self._fit(
             self._tensor_eval,
             self._tensor_eval_bool,
+            self._evaluated_indices,
+            self.distribution_type,
         )
 
         # Suggest next indices based on the selected acquisition function
@@ -128,7 +128,7 @@ class ParafacSampler(BaseSampler):
     def sample_independent(self, study, trial, param_name, param_distribution):
         logging.info(f"Using sample_independent for sampling with {self.independent_sampler} sampler.")
         if self.independent_sampler == "random":
-            sampler = optuna.samplers.RandomSampler(seed=self.seed)  # Pass the seed to the sampler
+            sampler = optuna.samplers.RandomSampler()
         else:
             raise ValueError("independent_sampler must be 'random'.")
         return sampler.sample_independent(study, trial, param_name, param_distribution)
@@ -198,8 +198,10 @@ class ParafacSampler(BaseSampler):
         self,
         tensor_eval: np.ndarray,
         tensor_eval_bool: np.ndarray,
+        all_evaluated_indices: list[tuple[int, ...]],
+        distribution_type: str,
     ) -> tuple[np.ndarray, np.ndarray]:
-        eval_mean, eval_std = self._calculate_eval_stats(
+        eval_min, eval_max, eval_mean, eval_std = self._calculate_eval_stats(
             tensor_eval
         )
 
@@ -207,8 +209,11 @@ class ParafacSampler(BaseSampler):
             self._decompose_with_optional_mask(
                 tensor_eval,
                 tensor_eval_bool,
+                eval_min,
+                eval_max,
                 eval_mean,
                 eval_std,
+                distribution_type,
             )
             for _ in range(self.decomp_iter_num)
         ]
@@ -222,9 +227,33 @@ class ParafacSampler(BaseSampler):
     ) -> tuple[float, float, float, float]:
         finite_values = tensor_eval[np.isfinite(tensor_eval)]
         return (
+            np.nanmin(finite_values),
+            np.nanmax(finite_values),
             np.nanmean(finite_values),
             np.nanstd(finite_values),
         )
+
+    def _generate_random_array(
+        self,
+        low: float,
+        high: float,
+        shape: tuple[int, ...],
+        distribution_type: str = "uniform",
+        mean: float = 0,
+        std_dev: float = 1,
+    ) -> np.ndarray:
+        if low == high:
+            low = low - 1e-1
+            high = high + 1e-1
+            std_dev = std_dev + 1e-1
+
+        if distribution_type == "uniform":
+            return self.rng.uniform(low, high, shape)
+        elif distribution_type == "normal":
+            normal_random = self.rng.normal(mean, std_dev, shape)
+            return np.clip(normal_random, low, high)
+        else:
+            raise ValueError("distribution_type must be either 'uniform' or 'normal'.")
 
     def _select_mask_indices(
         self, tensor_shape: tuple, tensor_eval_bool: np.ndarray
@@ -235,7 +264,6 @@ class ParafacSampler(BaseSampler):
             else np.argwhere(tensor_eval_bool == False)
         )
         mask_size = max(1, int(len(cand_indices) * self.mask_ratio))
-        # return self.rng.choice(cand_indices, mask_size, replace=False)  # Use self.rng.choice instead of random.sample
         return random.sample(list(cand_indices), mask_size)
 
     def _create_mask_tensor(
@@ -250,8 +278,11 @@ class ParafacSampler(BaseSampler):
         self,
         tensor_eval: np.ndarray,
         tensor_eval_bool: np.ndarray,
+        eval_min: float,
+        eval_max: float,
         eval_mean: float,
         eval_std: float,
+        distribution_type: str,
     ) -> np.ndarray:
         # Standardize tensor_eval
         standardized_tensor_eval = (tensor_eval - eval_mean) / (eval_std + 1e-8)
@@ -265,7 +296,15 @@ class ParafacSampler(BaseSampler):
             )
             mask_tensor = self._create_mask_tensor(tensor_eval.shape, mask_indices)
 
-        init_tensor_eval = self.rng.normal(0, 1, tensor_eval.shape)
+        # Generate random initialization tensor
+        init_tensor_eval = self._generate_random_array(
+            low=-1,
+            high=1,
+            shape=tensor_eval.shape,
+            distribution_type="normal",
+            mean=0,
+            std_dev=1,
+        )
 
         # Assign observed values
         init_tensor_eval[tensor_eval_bool] = standardized_tensor_eval[tensor_eval_bool]
@@ -277,7 +316,7 @@ class ParafacSampler(BaseSampler):
             mask=mask_tensor,
             n_iter_max=self.als_iter_num,
             init="random",
-            random_state=self.rng,  # Ensure the random state is passed
+            random_state=self.rng,
         )
         return cp_to_tensor(cp_tensor)
 

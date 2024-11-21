@@ -5,7 +5,8 @@ from functools import partial
 
 import numpy as np
 import optuna
-from _src import ParafacSampler, WarcraftObjective, set_logger
+from _src import WarcraftObjective, set_logger
+from _src import ParafacSamplerV2 as ParafacSampler
 
 
 def sphere(x):
@@ -72,15 +73,16 @@ def run_bo(settings):
         raise ValueError(f"Unsupported function type: {function}")
 
     sampler = ParafacSampler(
+        seed=settings["seed"],
         cp_rank=settings["cp_settings"]["rank"],
         als_iter_num=settings["cp_settings"]["als_iterations"],
         mask_ratio=settings["cp_settings"]["mask_ratio"],
         acquisition_function=settings["acqf_settings"]["acquisition_function"],
         trade_off_param=settings["acqf_settings"]["trade_off_param"],
-        seed=settings["seed"],
         unique_sampling=settings["unique_sampling"],
         decomp_iter_num=settings["decomp_num"],
         include_observed_points=settings["cp_settings"].get("include_observed_points", False),
+        n_startup_trials=settings["n_startup_trials"],
     )
 
     direction = "maximize" if settings["acqf_settings"]["maximize"] else "minimize"

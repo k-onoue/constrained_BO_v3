@@ -14,9 +14,12 @@ from src.objectives.warcraft import WarcraftObjective
 from src.samplers.parafac import ParafacSampler
 from src.utils_experiments import set_logger, parse_experiment_path
 
+from src.samplers.parafac_v2 import ParafacSamplerV2
+
 __all__ = [
     "WarcraftObjective",
     "ParafacSampler",
     "set_logger",
     "parse_experiment_path",
+    "ParafacSamplerV2",
 ]
