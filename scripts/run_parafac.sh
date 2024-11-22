@@ -4,7 +4,7 @@
 EXE_FILE="experiments/parafac.py"
 
 # Function to run the experiment
-run() {
+run_experiment() {
     local function=$1
     local timestamp=$2
     local dimension=$3
@@ -23,7 +23,8 @@ run() {
     local include_observed_points=${16}
     local acquisition_function=${17}
 
-    cmd=(
+    # Build the command
+    local cmd=(
         python3 "$EXE_FILE"
         --timestamp "$timestamp"
         --function "$function"
@@ -40,91 +41,76 @@ run() {
         --acquisition_function "$acquisition_function"
     )
 
-    # Include --acq_maximize if true
-    if [ "$acq_maximize" = true ]; then
-        cmd+=(--acq_maximize)
-    fi
+    # Add optional flags if enabled
+    [ "$acq_maximize" = true ] && cmd+=(--acq_maximize)
+    [ "$unique_sampling" = true ] && cmd+=(--unique_sampling)
+    [ "$include_observed_points" = true ] && cmd+=(--include_observed_points)
 
-    # Include --unique_sampling if true
-    if [ "$unique_sampling" = true ]; then
-        cmd+=(--unique_sampling)
-    fi
-
-    # Include --include_observed_points if true
-    if [ "$include_observed_points" = true ]; then
-        cmd+=(--include_observed_points)
-    fi
-
+    # Execute the command in the background
     "${cmd[@]}" &
 }
 
-# Main script
+# Initialize timestamp and results directory
 timestamp=$(date +"%Y-%m-%d_%H-%M-%S")
-
-# Create results directory
 results_dir="results/$timestamp"
 mkdir -p "$results_dir"
+cp "$0" "$results_dir"  # Copy script for reproducibility
 
-# Copy the script to the results directory
-cp "$0" "$results_dir"
-
+# Experiment parameters
 cp_rank=3
 cp_mask_ratio=0.9
 decomp_num=10
-
 acquisition_function="ei"  # "ei" or "ucb"
 acq_trade_off_param=1.0
 acq_batch_size=1
 acq_maximize=false
 cp_als_iterations=100
-
 n_startup_trials=1
-
 unique_sampling=false
 include_observed_points=false
-
 iter_bo=2000
 
-# functions=("sphere" "ackley")
+# Functions, dimensions, and seeds
 functions=("warcraft")
 dimensions=(4)
 map_options=(1 2)
 seed_list=(0 1 2 3 4 5 6 7 8 9)
 
+# Run experiments for each function
 for function in "${functions[@]}"; do
     case $function in
         "sphere" | "ackley")
             for dimension in "${dimensions[@]}"; do
                 for seed in "${seed_list[@]}"; do
-                    run "$function" "$timestamp" "$dimension" "$iter_bo" "$seed" 1 \
+                    run_experiment "$function" "$timestamp" "$dimension" "$iter_bo" "$seed" 1 \
                         "$acq_trade_off_param" "$acq_batch_size" "$acq_maximize" \
                         "$cp_rank" "$cp_als_iterations" "$cp_mask_ratio" \
                         "$decomp_num" "$n_startup_trials" \
                         "$unique_sampling" "$include_observed_points" "$acquisition_function"
                 done
-                # Wait for all processes in the current dimension to complete
-                # wait
+                # Wait for current dimension experiments to finish
+                wait
             done
             ;;
         "warcraft")
             for map_option in "${map_options[@]}"; do
                 for seed in "${seed_list[@]}"; do
-                    run "$function" "$timestamp" 2 "$iter_bo" "$seed" "$map_option" \
+                    run_experiment "$function" "$timestamp" 2 "$iter_bo" "$seed" "$map_option" \
                         "$acq_trade_off_param" "$acq_batch_size" "$acq_maximize" \
                         "$cp_rank" "$cp_als_iterations" "$cp_mask_ratio" \
                         "$decomp_num" "$n_startup_trials" \
                         "$unique_sampling" "$include_observed_points" "$acquisition_function"
                 done
-                # Wait for all processes in the current map option to complete
-                # wait
+                # Wait for current map option experiments to finish
+                wait
             done
             ;;
     esac
 done
 
-# Final wait to ensure all background processes are complete
+# Wait for all background processes to complete
 wait
 
-# Create a completion file in the results directory
+# Record completion
 completion_file="$results_dir/completion.txt"
 echo "All tasks completed at $(date)" > "$completion_file"

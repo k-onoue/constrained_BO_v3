@@ -4,7 +4,7 @@
 EXE_FILE="experiments/benchmark.py"
 
 # Function to run the benchmark
-run() {
+run_benchmark() {
     local function=$1
     local timestamp=$2
     local sampler=$3
@@ -13,7 +13,8 @@ run() {
     local seed=$6
     local map_option=$7
 
-    cmd=(
+    # Build the command
+    local cmd=(
         python3 "$EXE_FILE"
         --timestamp "$timestamp"
         --function "$function"
@@ -24,62 +25,59 @@ run() {
         --map_option "$map_option"
         --n_startup_trials "$n_startup_trials"
     )
+
+    # Execute the command in the background
     "${cmd[@]}" &
 }
 
-# Main script
+# Initialize timestamp and results directory
 timestamp=$(date +"%Y-%m-%d_%H-%M-%S")
-
-# Create results directory
 results_dir="results/$timestamp"
 mkdir -p "$results_dir"
+cp "$0" "$results_dir"  # Copy script for reproducibility
 
-# Copy the script to the results directory
-cp "$0" "$results_dir"
-
-iter_bo=500
-
-sampler_list=("tpe" "random" "gp" "hgp")
-# sampler_list=("gp" "hgp")
-
-# functions=("sphere" "ackley" "warcraft")
-functions=("warcraft")
-dimensions=(4)
-map_options=(1 2)
-seed_list=(0 1 2)
-
+# General experiment parameters
+iter_bo=2000
 n_startup_trials=1
 
+# Experiment configurations
+sampler_list=("tpe" "random" "gp" "hgp")
+functions=("warcraft")  # Add "sphere" and "ackley" as needed
+dimensions=(2 3 4 5 6 7 8 9)
+map_options=(1 2 3)
+seed_list=(0 1 2 3 4 5 6 7 8 9)
+
+# Main experiment loop
 for function in "${functions[@]}"; do
     case $function in
         "sphere" | "ackley")
             for dimension in "${dimensions[@]}"; do
                 for sampler in "${sampler_list[@]}"; do
                     for seed in "${seed_list[@]}"; do
-                        run "$function" "$timestamp" "$sampler" "$dimension" "$iter_bo" "$seed" 1 "$n_startup_trials"
+                        run_benchmark "$function" "$timestamp" "$sampler" "$dimension" "$iter_bo" "$seed" 1
                     done
                 done
-                # Wait for all processes in the current dimension to complete
-                # wait
+                # Wait for current dimension's processes to complete
+                wait
             done
             ;;
         "warcraft")
             for map_option in "${map_options[@]}"; do
                 for sampler in "${sampler_list[@]}"; do
                     for seed in "${seed_list[@]}"; do
-                        run "$function" "$timestamp" "$sampler" 2 "$iter_bo" "$seed" "$map_option" "$n_startup_trials"
+                        run_benchmark "$function" "$timestamp" "$sampler" 2 "$iter_bo" "$seed" "$map_option"
                     done
                 done
-                # Wait for all processes in the current map option to complete
-                # wait
+                # Wait for current map option's processes to complete
+                wait
             done
             ;;
     esac
 done
 
-# Final wait to ensure all background processes are complete
+# Wait for all background processes to complete
 wait
 
-# Create a completion file in the results directory
+# Record completion
 completion_file="$results_dir/completion.txt"
 echo "All tasks completed at $(date)" > "$completion_file"
