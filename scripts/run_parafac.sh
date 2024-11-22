@@ -70,7 +70,7 @@ cp "$0" "$results_dir"
 
 cp_rank=3
 cp_mask_ratio=0.9
-decomp_num=50
+decomp_num=10
 
 acquisition_function="ei"  # "ei" or "ucb"
 acq_trade_off_param=1.0
@@ -83,13 +83,13 @@ n_startup_trials=1
 unique_sampling=false
 include_observed_points=false
 
-iter_bo=500
+iter_bo=2000
 
 # functions=("sphere" "ackley")
 functions=("warcraft")
 dimensions=(4)
-map_options=(1)
-seed_list=(0 1 2 3 4)
+map_options=(1 2)
+seed_list=(0 1 2 3 4 5 6 7 8 9)
 
 for function in "${functions[@]}"; do
     case $function in
