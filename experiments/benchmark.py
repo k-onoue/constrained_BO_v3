@@ -29,7 +29,8 @@ def ackley(x):
 
 def objective(trial, dimension=None, function=None, map_shape=None, objective_function=None):
     if function in ["sphere", "ackley"]:
-        categories = list(range(-5, 6))
+        # categories = list(range(-5, 6))
+        categories = list(range(-3, 4))
 
         categories = random.shuffle(categories)    
 
