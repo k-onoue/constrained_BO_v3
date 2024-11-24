@@ -43,9 +43,12 @@ n_startup_trials=1
 # Experiment configurations
 # sampler_list=("tpe" "random" "gp" "hgp")
 sampler_list=("gp" "hgp")
-functions=("warcraft" "sphere" "ackley")  # Add "sphere" and "ackley" as needed
-dimensions=(2 3 4 5 6 7 8 9)
-map_options=(1 2 3)
+# functions=("warcraft" "sphere" "ackley")  # Add "sphere" and "ackley" as needed
+functions=("sphere" "ackley")  # Add "sphere" and "ackley" as needed
+# dimensions=(2 3 4 5 6 7 8 9)
+dimensions=(4 6)
+# map_options=(1 2 3)
+# seed_list=(0 1 2 3 4 5 6 7 8 9)
 seed_list=(0 1 2 3 4 5 6 7 8 9)
 
 # Main experiment loop

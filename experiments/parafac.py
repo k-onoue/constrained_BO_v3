@@ -42,7 +42,8 @@ def objective(trial, dimension=None, function=None, map_shape=None, objective_fu
         # categories = list(range(-5, 6))
         categories = list(range(-3, 4))
 
-        categories = random.shuffule(categories)
+        ##########################
+        random.shuffule(categories)
 
         x = np.array([trial.suggest_categorical(f"x_{i}", categories) for i in range(dimension)])
         if function == "sphere":
@@ -52,7 +53,8 @@ def objective(trial, dimension=None, function=None, map_shape=None, objective_fu
     elif function == "warcraft":
         directions = ["oo", "ab", "ac", "ad", "bc", "bd", "cd"]
 
-        directions = random.shuffle(directions)
+        ##########################
+        random.shuffle(directions)
 
         x = np.empty(map_shape, dtype=object)
         for i in range(map_shape[0]):
