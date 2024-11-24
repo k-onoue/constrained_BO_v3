@@ -3,6 +3,8 @@ import logging
 import os
 from functools import partial
 
+import random 
+
 import numpy as np
 import optuna
 from _src import DB_DIR, LOG_DIR, WarcraftObjective, set_logger
@@ -28,6 +30,9 @@ def ackley(x):
 def objective(trial, dimension=None, function=None, map_shape=None, objective_function=None):
     if function in ["sphere", "ackley"]:
         categories = list(range(-5, 6))
+
+        categories = random.shuffle(categories)    
+
         x = np.array([trial.suggest_categorical(f"x_{i}", categories) for i in range(dimension)])
         if function == "sphere":
             return sphere(x)
@@ -35,6 +40,9 @@ def objective(trial, dimension=None, function=None, map_shape=None, objective_fu
             return ackley(x)
     elif function == "warcraft":
         directions = ["oo", "ab", "ac", "ad", "bc", "bd", "cd"]
+
+        directions = random.shuffle(directions)
+
         x = np.empty(map_shape, dtype=object)
         for i in range(map_shape[0]):
             for j in range(map_shape[1]):
@@ -45,6 +53,8 @@ def objective(trial, dimension=None, function=None, map_shape=None, objective_fu
 
 
 def run_bo(settings):
+    random.seed(settings['seed'])
+
     function = settings["function"]
     
     if function in ["sphere", "ackley"]:

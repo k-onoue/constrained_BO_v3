@@ -37,17 +37,19 @@ mkdir -p "$results_dir"
 cp "$0" "$results_dir"  # Copy script for reproducibility
 
 # General experiment parameters
-iter_bo=2000
+iter_bo=500
 n_startup_trials=1
 
 # Experiment configurations
-sampler_list=("tpe" "random" "gp" "hgp")
-functions=("warcraft")  # Add "sphere" and "ackley" as needed
+# sampler_list=("tpe" "random" "gp" "hgp")
+sampler_list=("gp" "hgp")
+functions=("warcraft" "sphere" "ackley")  # Add "sphere" and "ackley" as needed
 dimensions=(2 3 4 5 6 7 8 9)
 map_options=(1 2 3)
 seed_list=(0 1 2 3 4 5 6 7 8 9)
 
 # Main experiment loop
+
 for function in "${functions[@]}"; do
     case $function in
         "sphere" | "ackley")
@@ -56,9 +58,10 @@ for function in "${functions[@]}"; do
                     for seed in "${seed_list[@]}"; do
                         run_benchmark "$function" "$timestamp" "$sampler" "$dimension" "$iter_bo" "$seed" 1
                     done
+
+                    # Wait for current sampler's processes to complete
+                    wait
                 done
-                # Wait for current dimension's processes to complete
-                wait
             done
             ;;
         "warcraft")
@@ -67,13 +70,19 @@ for function in "${functions[@]}"; do
                     for seed in "${seed_list[@]}"; do
                         run_benchmark "$function" "$timestamp" "$sampler" 2 "$iter_bo" "$seed" "$map_option"
                     done
+
+                    # Wait for current sampler's processes to complete
+                    wait
                 done
-                # Wait for current map option's processes to complete
-                wait
             done
             ;;
     esac
+
+    # Wait for current function's processes to complete
+    # wait
 done
+
+
 
 # Wait for all background processes to complete
 wait

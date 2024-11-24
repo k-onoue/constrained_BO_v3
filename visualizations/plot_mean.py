@@ -112,7 +112,7 @@ if __name__ == "__main__":
     args = parser.parse_args()
 
     # ベースディレクトリと共通部分を設定
-    result_dir = "/Users/keisukeonoue/ws/constrained_BO_v3/results"
+    result_dir = "/Users/keisukeonoue/ws/constrained_BO_v3/results_benchmark"
     base_dir = os.path.join(result_dir, args.target_dir_name)
     common_prefix = f"{args.target_dir_name}_"
 
