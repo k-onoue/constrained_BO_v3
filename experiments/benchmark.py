@@ -8,6 +8,7 @@ import random
 import numpy as np
 import optuna
 from _src import DB_DIR, LOG_DIR, WarcraftObjective, set_logger
+from _src import CustomBoTorchSampler
 from optuna.samplers import BruteForceSampler, RandomSampler, TPESampler
 from optuna.samplers import CustomGPSampler as GPSampler
 from optuna.samplers import GPSampler as HGPSampler
@@ -107,6 +108,18 @@ def parse_args():
     return parser.parse_args()
 
 
+def get_map(map_option: int):
+    if map_option == 1:
+        map_targeted = np.array([[1, 4], [2, 1]])
+    elif map_option == 2:
+        map_targeted = np.array([[1, 4, 1], [2, 1, 1]])
+    elif map_option == 3:
+        map_targeted = np.array([[1, 4, 1], [2, 1, 3], [5, 2, 1]])
+    else:
+        raise ValueError(f"Invalid map option: {map_option}")
+    return map_targeted / map_targeted.sum()
+
+
 def get_sampler(sampler_type: str, seed: int):
     if sampler_type == "random":
         return RandomSampler(seed=seed)
@@ -118,20 +131,15 @@ def get_sampler(sampler_type: str, seed: int):
         return GPSampler(seed=seed, n_startup_trials=args.n_startup_trials)
     elif sampler_type == "bruteforce":
         return BruteForceSampler()
+    elif sampler_type == "botorch":
+        from _src import CustomBoTorchSampler
+        return CustomBoTorchSampler(
+            n_startup_trials=args.n_startup_trials,
+            seed=seed,
+            candidates_func=None  # Use the default or replace with a custom function
+        )
     else:
         raise ValueError(f"Unsupported sampler type: {sampler_type}")
-
-
-def get_map(map_option: int):
-    if map_option == 1:
-        map_targeted = np.array([[1, 4], [2, 1]])
-    elif map_option == 2:
-        map_targeted = np.array([[1, 4, 1], [2, 1, 1]])
-    elif map_option == 3:
-        map_targeted = np.array([[1, 4, 1], [2, 1, 3], [5, 2, 1]])
-    else:
-        raise ValueError(f"Invalid map option: {map_option}")
-    return map_targeted / map_targeted.sum()
 
 
 if __name__ == "__main__":
@@ -175,3 +183,4 @@ if __name__ == "__main__":
 
     logging.info(f"Experiment settings: {settings}")
     run_bo(settings)
+    

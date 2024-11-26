@@ -11,13 +11,14 @@ DB_DIR = config["paths"]["dbs_dir"]
 sys.path.append(PROJECT_DIR)
 
 from src.objectives.warcraft import WarcraftObjective
+from src.samplers.custom_botorch import CustomBoTorchSampler
 from src.samplers.parafac import ParafacSampler
 from src.utils_experiments import set_logger, parse_experiment_path
 
-from src.samplers.parafac_v2 import ParafacSamplerV2
 
 __all__ = [
     "WarcraftObjective",
+    "CustomBoTorchSampler",
     "ParafacSampler",
     "set_logger",
     "parse_experiment_path",
