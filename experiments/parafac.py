@@ -39,21 +39,9 @@ def objective(trial, dimension=None, function=None, map_shape=None, objective_fu
     Objective function for Bayesian optimization.
     """
     if function in ["sphere", "ackley"]:
-        # categories = list(range(-5, 6))
+        categories = list(range(-5, 6))
 
-        categories_list = [
-            [-2, -3, 2, 1, -1, 3, 0],
-            [1, -3, 0, 3, -1, -2, 2],
-            [0, 2, -1, -3, 1, -2, 3],
-            [-3, -1, 1, 2, 0, -2, 3],
-            [0, 3, 2, -2, -3, -1, 1],
-            [-1, -3, -2, 1, 0, 3, 2],
-            [3, -1, 1, 2, -3, -2, 0],
-            [0, 3, 1, -2, -3, -1, 2],
-            [3, 1, 0, -2, -3, 2, -1]
-        ]
-
-        x = np.array([trial.suggest_categorical(f"x_{i}", categories_list[i]) for i in range(dimension)])
+        x = np.array([trial.suggest_categorical(f"x_{i}", categories) for i in range(dimension)])
         if function == "sphere":
             return sphere(x)
         elif function == "ackley":
