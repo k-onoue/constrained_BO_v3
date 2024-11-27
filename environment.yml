@@ -83,7 +83,7 @@ dependencies:
       - notebook==7.2.2
       - notebook_shim==0.2.4
       - numpy==2.1.2
-      - optuna==4.0.0
+      - -e git+https://github.com/optuna/optuna.git@ef16a045e95b91134f6c049116dc19adb0e8bb8c#egg=optuna
       - optunahub==0.1.0
       - overrides==7.7.0
       - packaging==24.1
@@ -128,7 +128,7 @@ dependencies:
       - stack-data==0.6.3
       - sympy==1.13.3
       - tenacity==9.0.0
-      - tensorly==0.8.1
+      - tensorly @ git+https://github.com/tensorly/tensorly.git@edd74d150bf46ad205005c8b0f773c6d625e81f5
       - terminado==0.18.1
       - threadpoolctl==3.5.0
       - tinycss2==1.3.0
