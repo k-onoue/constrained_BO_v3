@@ -25,7 +25,7 @@ class ParafacSampler(BaseSampler):
         acquisition_function: Literal["ucb", "ei"] = "ucb",  # 追加: 獲得関数の選択
         n_startup_trials: int = 1,
         independent_sampler: Literal["random"] = "random",  # Remove qmc option
-        constraint_builder = None,
+        tensor_constraint = None,
     ):
         # Random seed
         self.seed = seed
@@ -51,7 +51,7 @@ class ParafacSampler(BaseSampler):
         self._evaluated_indices = []
         self._tensor_eval = None
         self._tensor_eval_bool = None
-        self._tensor_constraint = constraint_builder()
+        self._tensor_constraint = tensor_constraint
         self._maximize = None
 
         # Debugging
@@ -400,3 +400,145 @@ class ParafacSampler(BaseSampler):
 
         return top_indices
     
+
+
+import random
+import numpy as np
+import optuna
+from functools import partial
+from src.objectives.warcraft import WarcraftObjective
+
+
+def build_constraint_warcraft(map_shape: tuple[int, int]) -> np.ndarray:
+    # Directions dictionary
+    directions_dict = {
+        "oo": np.array([0, 0]),
+        "ab": np.array([1, 1]),
+        "ac": np.array([0, 2]),
+        "ad": np.array([1, 1]),
+        "bc": np.array([1, 1]),
+        "bd": np.array([2, 0]),
+        "cd": np.array([1, 1]),
+    }
+
+    directions_list = list(directions_dict.keys())
+
+    # Map parameters
+    map_length = map_shape[0] * map_shape[1]
+    ideal_gain = (map_shape[0] + map_shape[1] - 1) * 2
+
+    # Initialize constraints as NumPy arrays
+    tensor_constraint_1 = np.zeros((len(directions_list),) * map_length)
+    tensor_constraint_2 = np.zeros((len(directions_list),) * map_length)
+    tensor_constraint_3 = np.zeros((len(directions_list),) * map_length)
+
+    # Constraint 1: (0, 0) != "oo", "ab"
+    for direction in directions_list:
+        if direction not in ["oo", "ab"]:
+            tensor_constraint_1[..., directions_list.index(direction)] = 1
+
+    # Constraint 2: (map_shape[0] - 1, map_shape[1] - 1) != "oo", "cd"
+    for direction in directions_list:
+        if direction not in ["oo", "cd"]:
+            tensor_constraint_2[directions_list.index(direction), ...] = 1
+
+    # Constraint 3: len[path] == map_shape[0] * map_shape[1]
+    for index, _ in np.ndenumerate(tensor_constraint_3):
+        gain = np.sum([directions_dict[directions_list[idx]].sum() for idx in index])
+        if gain == ideal_gain:
+            tensor_constraint_3[index] = 1
+
+    # Combine constraints with logical AND
+    tensor_constraint = np.logical_and(
+        tensor_constraint_1,
+        np.logical_and(tensor_constraint_2, tensor_constraint_3)
+    )
+
+    return tensor_constraint
+
+
+def objective(trial, map_shape=None, objective_function=None):
+    directions = ["oo", "ab", "ac", "ad", "bc", "bd", "cd"]
+    x = np.empty(map_shape, dtype=object)
+    for i in range(map_shape[0]):
+        for j in range(map_shape[1]):
+            x[i, j] = trial.suggest_categorical(f"x_{i}_{j}", directions)
+    return objective_function(x)
+
+
+def get_map(map_option: int):
+    if map_option == 1:
+        map_targeted = np.array([[1, 4], [2, 1]])
+    elif map_option == 2:
+        map_targeted = np.array([[1, 4, 1], [2, 1, 1]])
+    elif map_option == 3:
+        map_targeted = np.array([[1, 4, 1], [2, 1, 3], [5, 2, 1]])
+    else:
+        raise ValueError(f"Invalid map option: {map_option}")
+    return map_targeted / map_targeted.sum()
+
+
+def run_bo():
+    settings = {
+        "name": "test_study",
+        "seed": 0,
+        "map_option": 1,
+        "iter_bo": 10,
+        "unique_sampling": False,
+        "decomp_num": 5,
+        "cp_settings": {
+            "rank": 2,
+            "als_iterations": 100,
+            "mask_ratio": 0.1,
+            "include_observed_points": False,
+        },
+        "acqf_settings": {
+            "acquisition_function": "ucb",
+            "trade_off_param": 3.0,
+            "batch_size": 10,
+            "maximize": True,
+        },
+        "n_startup_trials": 10,
+    }
+
+    random.seed(settings['seed'])
+
+    map_targeted = get_map(settings["map_option"])
+    map_shape = map_targeted.shape
+    objective_function = WarcraftObjective(map_targeted)
+    objective_with_args = partial(objective, map_shape=map_shape, objective_function=objective_function)
+
+    sampler = ParafacSampler(
+        cp_rank=settings["cp_settings"]["rank"],
+        als_iter_num=settings["cp_settings"]["als_iterations"],
+        mask_ratio=settings["cp_settings"]["mask_ratio"],
+        acquisition_function=settings["acqf_settings"]["acquisition_function"],
+        trade_off_param=settings["acqf_settings"]["trade_off_param"],
+        seed=settings["seed"],
+        unique_sampling=settings["unique_sampling"],
+        decomp_iter_num=settings["decomp_num"],
+        include_observed_points=settings["cp_settings"].get("include_observed_points", False),
+        tensor_constraint=build_constraint_warcraft(map_shape),
+    )
+
+    direction = "maximize" if settings["acqf_settings"]["maximize"] else "minimize"
+
+    study = optuna.create_study(
+        study_name=settings["name"],
+        sampler=sampler,
+        direction=direction,
+    )
+
+    study.optimize(objective_with_args, n_trials=settings["iter_bo"])
+
+    best_x = np.empty(map_shape, dtype=object)
+    for i in range(map_shape[0]):
+        for j in range(map_shape[1]):
+            best_x[i, j] = study.best_params[f"x_{i}_{j}"]
+
+    optuna.visualization.plot_optimization_history(study)
+
+
+
+if __name__ == "__main__":
+    run_bo()

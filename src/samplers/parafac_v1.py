@@ -25,7 +25,6 @@ class ParafacSampler(BaseSampler):
         acquisition_function: Literal["ucb", "ei"] = "ucb",  # 追加: 獲得関数の選択
         n_startup_trials: int = 1,
         independent_sampler: Literal["random"] = "random",  # Remove qmc option
-        constraint_builder = None,
     ):
         # Random seed
         self.seed = seed
@@ -51,7 +50,6 @@ class ParafacSampler(BaseSampler):
         self._evaluated_indices = []
         self._tensor_eval = None
         self._tensor_eval_bool = None
-        self._tensor_constraint = constraint_builder()
         self._maximize = None
 
         # Debugging
@@ -269,14 +267,6 @@ class ParafacSampler(BaseSampler):
 
         init_tensor_eval = self.rng.normal(0, 1, tensor_eval.shape)
 
-        # Apply constraints
-        if self._tensor_constraint:
-            init_tensor_eval = np.where(
-                self._tensor_constraint == 0, 
-                -100 if self._maximize else 100, 
-                init_tensor_eval
-            )
-
         # Assign observed values
         init_tensor_eval[tensor_eval_bool] = standardized_tensor_eval[tensor_eval_bool]
 
@@ -373,6 +363,9 @@ class ParafacSampler(BaseSampler):
         #     "Std": np.std(std_tensor),
         # }
 
+        # logging.info(f"Candidate Mean Stats: {mean_stats}")
+        # logging.info(f"Candidate Std Stats: {std_stats}")
+
         # Define EI calculation
         def _ei(mean_tensor, std_tensor, f_best, maximize=True) -> np.ndarray:
             std_tensor = np.clip(std_tensor, 1e-9, None)
@@ -399,4 +392,3 @@ class ParafacSampler(BaseSampler):
         top_indices = list(zip(*top_indices))
 
         return top_indices
-    
