@@ -100,13 +100,12 @@ class WarcraftObjective:
     def __init__(
         self,
         weight_matrix: np.ndarray,
+        tensor_constraint: np.ndarray = None,
     ) -> None:
         self.weight_matrix = weight_matrix / np.sum(weight_matrix)  # normalize
         self.shape = weight_matrix.shape
 
-    def calculate_penalty_type2(self, idx, val, map_shape):
-        # Define the mask dictionary within the function
-        val_mask_dict = {
+        self._val_mask_dict = {
             "oo": np.zeros((3, 3)),
             "ab": np.array([[0, 1, 0], [1, 1, 0], [0, 0, 0]]),
             "ac": np.array([[0, 0, 0], [1, 1, 1], [0, 0, 0]]),
@@ -115,6 +114,12 @@ class WarcraftObjective:
             "bd": np.array([[0, 1, 0], [0, 1, 0], [0, 1, 0]]),
             "cd": np.array([[0, 0, 0], [0, 1, 1], [0, 1, 0]]),
         }
+
+        self._tensor_constraint = tensor_constraint
+
+    def calculate_penalty_type2(self, idx, val, map_shape):
+        # Define the mask dictionary within the function
+        val_mask_dict = self._val_mask_dict
 
         # Initialize the expanded array with zeros, sized (2*map_shape[0] + 1, 2*map_shape[1] + 1)
         arr_expanded = np.zeros((map_shape[0] * 2 + 1, map_shape[1] * 2 + 1))
@@ -155,6 +160,21 @@ class WarcraftObjective:
             direction_matrix = x
         else:
             direction_matrix = np.array(x)
+
+        ############################################################
+        ############################################################
+        ############################################################
+        ############################################################
+        ############################################################
+        ############################################################
+        ############################################################
+        ############################################################
+        ############################################################
+        if self._tensor_constraint is not None:
+            directions_list = list(self._val_mask_dict.keys())
+            sequence = tuple(directions_list.index(direction) for direction in direction_matrix.flatten())
+            if not self._tensor_constraint[sequence]:
+                return 10
 
         # Create a mask where "oo" is 0 and other directions are 1
         mask = np.where(direction_matrix == "oo", 0, 1)
@@ -203,6 +223,56 @@ class WarcraftObjective:
         """Visualize the direction matrix."""
         direction_matrix = x
         print(direction_matrix)
+
+
+def build_constraint_warcraft(map_shape: tuple[int, int]) -> np.ndarray:
+    # Directions dictionary
+    directions_dict = {
+        "oo": np.array([0, 0]),
+        "ab": np.array([1, 1]),
+        "ac": np.array([0, 2]),
+        "ad": np.array([1, 1]),
+        "bc": np.array([1, 1]),
+        "bd": np.array([2, 0]),
+        "cd": np.array([1, 1]),
+    }
+
+    directions_list = list(directions_dict.keys())
+
+    # Map parameters
+    map_length = map_shape[0] * map_shape[1]
+    ideal_gain = (map_shape[0] + map_shape[1] - 1) * 2
+
+    # Initialize constraints as NumPy arrays
+    tensor_constraint_1 = np.zeros((len(directions_list),) * map_length)
+    tensor_constraint_2 = np.zeros((len(directions_list),) * map_length)
+    tensor_constraint_3 = np.zeros((len(directions_list),) * map_length)
+
+    # Constraint 1: (0, 0) != "oo", "ab"
+    for direction in directions_list:
+        if direction not in ["oo", "ab"]:
+            # tensor_constraint_1[..., directions_list.index(direction)] = 1
+            tensor_constraint_1[directions_list.index(direction), ...] = 1
+
+    # Constraint 2: (map_shape[0] - 1, map_shape[1] - 1) != "oo", "cd"
+    for direction in directions_list:
+        if direction not in ["oo", "cd"]:
+            # tensor_constraint_2[directions_list.index(direction), ...] = 1
+            tensor_constraint_2[..., directions_list.index(direction)] = 1
+
+    # Constraint 3: len[path] == map_shape[0] * map_shape[1]
+    for index, _ in np.ndenumerate(tensor_constraint_3):
+        gain = np.sum([directions_dict[directions_list[idx]].sum() for idx in index])
+        if gain == ideal_gain:
+            tensor_constraint_3[index] = 1
+
+    # Combine constraints with logical AND
+    tensor_constraint = np.logical_and(
+        tensor_constraint_1,
+        np.logical_and(tensor_constraint_2, tensor_constraint_3)
+    )
+
+    return tensor_constraint
 
 
 # if __name__ == "__main__":

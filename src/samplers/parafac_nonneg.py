@@ -23,8 +23,7 @@ class NonnegParafacSampler(BaseSampler):
         decomp_iter_num: int = 5,
         include_observed_points: bool = False,
         acquisition_function: Literal["ucb", "ei"] = "ucb",  # 追加: 獲得関数の選択
-        n_startup_trials: int = 1,
-        independent_sampler: Literal["random"] = "random",  # Remove qmc option
+        n_startup_trials: int = 1
     ):
         # Random seed
         self.seed = seed
@@ -41,7 +40,7 @@ class NonnegParafacSampler(BaseSampler):
         self.include_observed_points = include_observed_points
         self.acquisition_function = acquisition_function  # 追加: 獲得関数の設定
         self.n_startup_trials = n_startup_trials
-        self.independent_sampler = independent_sampler  # Store the independent sampler choice
+        self.independent_sampler = optuna.samplers.RandomSampler(seed=seed)  # Remove qmc option
 
         # Internal storage
         self._param_names = None
@@ -127,11 +126,7 @@ class NonnegParafacSampler(BaseSampler):
 
     def sample_independent(self, study, trial, param_name, param_distribution):
         logging.info(f"Using sample_independent for sampling with {self.independent_sampler} sampler.")
-        if self.independent_sampler == "random":
-            sampler = optuna.samplers.RandomSampler(seed=self.seed)  # Pass the seed to the sampler
-        else:
-            raise ValueError("independent_sampler must be 'random'.")
-        return sampler.sample_independent(study, trial, param_name, param_distribution)
+        return self.independent_sampler.sample_independent(study, trial, param_name, param_distribution)
 
     def _initialize_internal_structure(self, search_space, study):
         self._param_names = sorted(search_space.keys())

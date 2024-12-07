@@ -1,13 +1,13 @@
 import argparse
 import logging
 import os
-from functools import partial
-
 import random
+from functools import partial
 
 import numpy as np
 import optuna
-from _src import ParafacSampler, WarcraftObjective, set_logger
+
+from _src import ParafacSampler, WarcraftObjective, build_constraint_warcraft, set_logger
 
 
 def sphere(x):
@@ -73,11 +73,14 @@ def run_bo(settings):
     elif function == "warcraft":
         map_targeted = settings["map"]
         map_shape = map_targeted.shape
-        objective_function = WarcraftObjective(map_targeted)
+
+        tensor_constraint = build_constraint_warcraft(map_shape)
+
+        objective_function = WarcraftObjective(map_targeted, tensor_constraint=tensor_constraint)
         objective_with_args = partial(objective, map_shape=map_shape, objective_function=objective_function, function=function)
     else:
         raise ValueError(f"Unsupported function type: {function}") 
-
+    
     sampler = ParafacSampler(
         cp_rank=settings["cp_settings"]["rank"],
         als_iter_num=settings["cp_settings"]["als_iterations"],
@@ -88,6 +91,7 @@ def run_bo(settings):
         unique_sampling=settings["unique_sampling"],
         decomp_iter_num=settings["decomp_num"],
         include_observed_points=settings["cp_settings"].get("include_observed_points", False),
+        tensor_constraint=tensor_constraint
     )
 
     direction = "maximize" if settings["acqf_settings"]["maximize"] else "minimize"
@@ -152,6 +156,9 @@ def get_map(map_option: int):
 
 if __name__ == "__main__":
     base_script_name = os.path.splitext(__file__.split("/")[-1])[0]
+
+    print(f"Running script: {base_script_name}")
+
     args = parse_args()
 
     timestamp = args.timestamp

@@ -24,8 +24,7 @@ class ParafacSampler(BaseSampler):
         include_observed_points: bool = False,
         acquisition_function: Literal["ucb", "ei"] = "ucb",  # 追加: 獲得関数の選択
         n_startup_trials: int = 1,
-        independent_sampler: Literal["random"] = "random",  # Remove qmc option
-        constraint_builder = None,
+        tensor_constraint = None,
     ):
         # Random seed
         self.seed = seed
@@ -42,7 +41,7 @@ class ParafacSampler(BaseSampler):
         self.include_observed_points = include_observed_points
         self.acquisition_function = acquisition_function  # 追加: 獲得関数の設定
         self.n_startup_trials = n_startup_trials
-        self.independent_sampler = independent_sampler  # Store the independent sampler choice
+        self.independent_sampler = optuna.samplers.RandomSampler(seed=seed)
 
         # Internal storage
         self._param_names = None
@@ -51,7 +50,7 @@ class ParafacSampler(BaseSampler):
         self._evaluated_indices = []
         self._tensor_eval = None
         self._tensor_eval_bool = None
-        self._tensor_constraint = constraint_builder()
+        self._tensor_constraint = tensor_constraint
         self._maximize = None
 
         # Debugging
@@ -129,11 +128,7 @@ class ParafacSampler(BaseSampler):
 
     def sample_independent(self, study, trial, param_name, param_distribution):
         logging.info(f"Using sample_independent for sampling with {self.independent_sampler} sampler.")
-        if self.independent_sampler == "random":
-            sampler = optuna.samplers.RandomSampler(seed=self.seed)  # Pass the seed to the sampler
-        else:
-            raise ValueError("independent_sampler must be 'random'.")
-        return sampler.sample_independent(study, trial, param_name, param_distribution)
+        return self.independent_sampler.sample_independent(study, trial, param_name, param_distribution)
 
     def _initialize_internal_structure(self, search_space, study):
         self._param_names = sorted(search_space.keys())
@@ -211,34 +206,70 @@ class ParafacSampler(BaseSampler):
                 tensor_eval_bool,
                 eval_mean,
                 eval_std,
+                self._maximize
             )
             for _ in range(self.decomp_iter_num)
         ]
 
         return self._calculate_mean_std_tensors(
-            tensors_list, tensor_eval, tensor_eval_bool
+            tensors_list, tensor_eval, tensor_eval_bool, self._maximize
         )
 
     def _calculate_eval_stats(
         self, tensor_eval: np.ndarray
     ) -> tuple[float, float, float, float]:
-        finite_values = tensor_eval[np.isfinite(tensor_eval)]
+        eval_copy = np.copy(tensor_eval)
+        # Filter with constraint
+        eval_copy[self._tensor_constraint == 0] = np.nan
+
+        finite_values = eval_copy[np.isfinite(eval_copy)]
+
         return (
             np.nanmean(finite_values),
             np.nanstd(finite_values),
         )
 
+    # def _select_mask_indices(
+    #     self, tensor_shape: tuple, tensor_eval_bool: np.ndarray
+    # ) -> np.ndarray:
+    #     cand_indices = (
+    #         np.indices(tensor_shape).reshape(len(tensor_shape), -1).T
+    #         if self.include_observed_points
+    #         else np.argwhere(tensor_eval_bool == False)
+    #     )
+
+    #     mask_size = max(1, int(len(cand_indices) * self.mask_ratio))
+    #     # return self.rng.choice(cand_indices, mask_size, replace=False)  # Use self.rng.choice instead of random.sample
+    #     return random.sample(list(cand_indices), mask_size)
+
     def _select_mask_indices(
         self, tensor_shape: tuple, tensor_eval_bool: np.ndarray
     ) -> np.ndarray:
-        cand_indices = (
-            np.indices(tensor_shape).reshape(len(tensor_shape), -1).T
-            if self.include_observed_points
-            else np.argwhere(tensor_eval_bool == False)
-        )
+        # Get candidate indices where self._tensor_constraint is 1
+        constrained_indices = np.argwhere(self._tensor_constraint == 1)
+
+        # Filter candidate indices based on whether to include observed points
+        if self.include_observed_points:
+            cand_indices = np.indices(tensor_shape).reshape(len(tensor_shape), -1).T
+        else:
+            cand_indices = np.argwhere(tensor_eval_bool == False)
+
+
+        # # Too slow ---------------------------------------------
+        # # Intersect the constrained indices with the candidate indices
+        # cand_indices = np.array([tuple(idx) for idx in cand_indices if tuple(idx) in map(tuple, constrained_indices)])
+        # # Too slow ---------------------------------------------
+
+        # Intersect the constrained indices with the candidate indices
+        constrained_indices_set = set(map(tuple, constrained_indices))
+        cand_indices = np.array([idx for idx in cand_indices if tuple(idx) in constrained_indices_set])
+
+        # Determine the mask size
         mask_size = max(1, int(len(cand_indices) * self.mask_ratio))
-        # return self.rng.choice(cand_indices, mask_size, replace=False)  # Use self.rng.choice instead of random.sample
-        return random.sample(list(cand_indices), mask_size)
+
+        # Select mask indices
+        selected_indices = self.rng.choice(len(cand_indices), mask_size, replace=False)
+        return cand_indices[selected_indices]
 
     def _create_mask_tensor(
         self, tensor_shape: tuple, mask_indices: np.ndarray
@@ -254,6 +285,7 @@ class ParafacSampler(BaseSampler):
         tensor_eval_bool: np.ndarray,
         eval_mean: float,
         eval_std: float,
+        maximize: bool
     ) -> np.ndarray:
         # Standardize tensor_eval
         standardized_tensor_eval = (tensor_eval - eval_mean) / (eval_std + 1e-8)
@@ -269,16 +301,17 @@ class ParafacSampler(BaseSampler):
 
         init_tensor_eval = self.rng.normal(0, 1, tensor_eval.shape)
 
-        # Apply constraints
-        if self._tensor_constraint:
-            init_tensor_eval = np.where(
-                self._tensor_constraint == 0, 
-                -100 if self._maximize else 100, 
-                init_tensor_eval
-            )
-
         # Assign observed values
-        init_tensor_eval[tensor_eval_bool] = standardized_tensor_eval[tensor_eval_bool]
+        condition = np.logical_and(tensor_eval_bool, self._tensor_constraint)
+        init_tensor_eval[condition] = standardized_tensor_eval[condition]
+
+        # Incorporate constraint 
+        if self._tensor_constraint is not None:
+
+            if maximize:
+                init_tensor_eval[self._tensor_constraint == 0] = np.nanmin(init_tensor_eval) - 1.0 * 1
+            else:
+                init_tensor_eval[self._tensor_constraint == 0] = np.nanmax(init_tensor_eval) + 1.0 * 1
 
         # Perform CP decomposition
         cp_tensor = parafac(
@@ -296,12 +329,22 @@ class ParafacSampler(BaseSampler):
         tensors_list: list[np.ndarray],
         tensor_eval: np.ndarray,
         tensor_eval_bool: np.ndarray,
+        maximize: bool
     ) -> tuple[np.ndarray, np.ndarray]:
         tensors_stack = np.stack(tensors_list)
         mean_tensor = np.mean(tensors_stack, axis=0)
         std_tensor = np.std(tensors_stack, axis=0)
+
         mean_tensor[tensor_eval_bool] = tensor_eval[tensor_eval_bool]
         std_tensor[tensor_eval_bool] = 0
+
+        if self._tensor_constraint is not None:
+            if maximize:
+                mean_tensor[self._tensor_constraint == 0] = np.min(mean_tensor) - 1.0
+            else:
+                mean_tensor[self._tensor_constraint == 0] = np.max(mean_tensor) + 1.0
+                
+            std_tensor[self._tensor_constraint == 0] = 0
 
         # Debugging
         self.mean_tensor = mean_tensor
@@ -399,4 +442,3 @@ class ParafacSampler(BaseSampler):
         top_indices = list(zip(*top_indices))
 
         return top_indices
-    

@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # File to execute
-EXE_FILE="experiments/parafac_nonneg.py"
+EXE_FILE="experiments/parafac-constrained.py"
 
 # Function to run the experiment
 run_experiment() {
@@ -68,19 +68,13 @@ cp_als_iterations=100
 n_startup_trials=1
 unique_sampling=false
 include_observed_points=false
-iter_bo=500
-
-# # Functions, dimensions, and seeds
-# functions=("warcraft" "sphere" "ackley")
-# map_options=(1 2)
-# dimensions=(2 3 4 5 6)
-# seed_list=(0 1 2 3 4 5 6 7 8 9)
+iter_bo=2000
 
 # Functions, dimensions, and seeds
 functions=("warcraft")
+dimensions=(4)
 map_options=(1 2)
-dimensions=(2 3 4 5 6)
-seed_list=(0 1 2 3)
+seed_list=(0 1 2 3 4 5 6 7 8 9)
 
 # Run experiments for each function
 for function in "${functions[@]}"; do
