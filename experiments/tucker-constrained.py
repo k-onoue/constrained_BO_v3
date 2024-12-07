@@ -82,7 +82,7 @@ def run_bo(settings):
         raise ValueError(f"Unsupported function type: {function}") 
     
     sampler = TuckerSampler(
-        tucker_rank=settings["tucker_settings"]["rank"],
+        tucker_rank_base=settings["tucker_settings"]["rank"],
         als_iter_num=settings["tucker_settings"]["als_iterations"],
         mask_ratio=settings["tucker_settings"]["mask_ratio"],
         acquisition_function=settings["acqf_settings"]["acquisition_function"],
@@ -131,7 +131,7 @@ def parse_args():
     parser.add_argument("--dimension", type=int, default=2, help="Number of dimensions for the function.")
     parser.add_argument("--function", type=str, choices=["sphere", "ackley", "warcraft"], default="sphere", help="Objective function to optimize.")
     parser.add_argument("--map_option", type=int, choices=[1, 2, 3], default=1, help="Select the map configuration: 1 for 2x2, 2 for 3x2, 3 for 3x3 (only for Warcraft).")
-    parser.add_argument("--tucker_rank", type=int, nargs='+', default=[2, 2, 2], help="Rank for the Tucker decomposition.")
+    parser.add_argument("--tucker_rank", type=int, default=2, help="Rank for the Tucker decomposition.")
     parser.add_argument("--tucker_als_iterations", type=int, default=100, help="Number of ALS iterations for the Tucker decomposition.")
     parser.add_argument("--tucker_mask_ratio", type=float, default=0.1, help="Mask ratio used in the Tucker decomposition.")
     parser.add_argument("--decomp_num", type=int, default=5, help="Number of iterations for the decomposition process.")
@@ -152,6 +152,7 @@ def get_map(map_option: int):
     else:
         raise ValueError(f"Invalid map option: {map_option}")
     return map_targeted / map_targeted.sum()
+
 
 
 if __name__ == "__main__":
@@ -190,7 +191,7 @@ if __name__ == "__main__":
         "unique_sampling": args.unique_sampling,
         "decomp_num": args.decomp_num,
         "tucker_settings": {
-            "rank": tuple(args.tucker_rank),
+            "rank": (args.tucker_rank,) * 3,  # Automatically set the rank as a tuple of three identical values
             "als_iterations": args.tucker_als_iterations,
             "mask_ratio": args.tucker_mask_ratio,
             "include_observed_points": args.include_observed_points,

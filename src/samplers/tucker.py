@@ -15,7 +15,7 @@ class TuckerSampler(BaseSampler):
     def __init__(
         self,
         seed: Optional[int] = None,
-        tucker_rank: int = 3,
+        tucker_rank_base: int = 3,
         als_iter_num: int = 10,
         mask_ratio: float = 0.2,
         trade_off_param: float = 1.0,
@@ -32,7 +32,8 @@ class TuckerSampler(BaseSampler):
         random.seed(seed)  # Ensure the global random seed is set
 
         # Initialization
-        self.tucker_rank = tucker_rank
+        self.tucker_rank_base = tucker_rank_base
+        self.tucker_rank = None
         self.als_iter_num = als_iter_num
         self.mask_ratio = mask_ratio
         self.trade_off_param = trade_off_param
@@ -151,6 +152,8 @@ class TuckerSampler(BaseSampler):
         self._tensor_eval_bool = np.zeros(self._shape, dtype=bool)
         self._evaluated_indices = []
         self._maximize = study.direction == optuna.study.StudyDirection.MAXIMIZE
+
+        self.tucker_rank = (self.tucker_rank_base,) * self._tensor_eval.ndim
 
     def _update_tensor(self, study):
         trials = study.get_trials(deepcopy=False)
