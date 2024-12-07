@@ -154,7 +154,6 @@ def get_map(map_option: int):
     return map_targeted / map_targeted.sum()
 
 
-
 if __name__ == "__main__":
     base_script_name = os.path.splitext(__file__.split("/")[-1])[0]
 
@@ -191,9 +190,10 @@ if __name__ == "__main__":
         "unique_sampling": args.unique_sampling,
         "decomp_num": args.decomp_num,
         "tucker_settings": {
-            "rank": (args.tucker_rank,) * 3,  # Automatically set the rank as a tuple of three identical values
+            "rank": args.tucker_rank,
             "als_iterations": args.tucker_als_iterations,
             "mask_ratio": args.tucker_mask_ratio,
+            "random_dist_type": "normal",
             "include_observed_points": args.include_observed_points,
         },
         "acqf_settings": {
