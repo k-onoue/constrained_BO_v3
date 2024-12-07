@@ -14,13 +14,16 @@ from src.objectives.warcraft import WarcraftObjective
 # from src.samplers.custom import CustomQMCSampler, CustomRandomSampler
 from src.samplers.parafac_v1 import ParafacSampler as ParafacSampler_v1
 from src.samplers.parafac import ParafacSampler
+from src.samplers.tucker import TuckerSampler
 from src.utils_experiments import search_log_files, set_logger
 
 from src.samplers.custom_gp import CustomGPSampler
 
 __all__ = [
     "WarcraftObjective",
+    "ParafacSampler_v1",
     "ParafacSampler",
+    "TuckerSampler",
     "search_log_files",
     "set_logger",
     "CustomGPSampler",

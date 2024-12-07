@@ -14,6 +14,7 @@ from src.objectives.warcraft import WarcraftObjective, build_constraint_warcraft
 from src.samplers.custom_botorch import CustomBoTorchSampler
 from src.samplers.parafac import ParafacSampler
 from src.samplers.parafac_nonneg import NonnegParafacSampler
+from src.samplers.tucker import TuckerSampler
 from src.utils_experiments import set_logger, parse_experiment_path
 
 
@@ -23,6 +24,7 @@ __all__ = [
     "CustomBoTorchSampler",
     "ParafacSampler",
     "NonnegParafacSampler",
+    "TuckerSampler",
     "set_logger",
     "parse_experiment_path",
     "ParafacSamplerV2",
