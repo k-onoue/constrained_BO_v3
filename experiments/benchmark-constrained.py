@@ -9,7 +9,7 @@ import numpy as np
 import optuna
 from optuna.samplers import BruteForceSampler, RandomSampler, TPESampler
 
-from _src import WarcraftObjective, build_constraint_warcraft, set_logger
+from _src import WarcraftObjective, ConstraintWarcraft, set_logger
 from _src import CustomBoTorchSampler as GPSampler
 
 
@@ -42,7 +42,6 @@ def objective(trial, dimension=None, function=None, map_shape=None, objective_fu
         x = np.empty(map_shape, dtype=object)
         for i in range(map_shape[0]):
             for j in range(map_shape[1]):
-
                 x[i, j] = trial.suggest_categorical(f"x_{i}_{j}", directions)
         return objective_function(x)
     else:
@@ -61,7 +60,9 @@ def run_bo(settings):
         map_targeted = settings["map"]
         map_shape = map_targeted.shape
 
-        tensor_constraint = build_constraint_warcraft(map_shape)
+        constraint_builder = ConstraintWarcraft(map_shape)
+        tensor_constraint = constraint_builder.tensor_constraint
+        init_violation_paths = constraint_builder.sample_violation_path(settings["n_init_violation_paths"])
 
         objective_function = WarcraftObjective(map_targeted, tensor_constraint=tensor_constraint)
         objective_with_args = partial(objective, map_shape=map_shape, objective_function=objective_function, function=function)
@@ -77,6 +78,21 @@ def run_bo(settings):
         direction=direction,
         storage=settings["storage"],
     )
+
+    # Add initial trials from violation paths
+    for violation_path in init_violation_paths:
+        # Flatten violation_path is assumed
+        params = {f"x_{i}_{j}": violation_path[i * map_shape[1] + j] for i in range(map_shape[0]) for j in range(map_shape[1])}
+        distributions = {f"x_{i}_{j}": optuna.distributions.CategoricalDistribution(["oo", "ab", "ac", "ad", "bc", "bd", "cd"]) for i in range(map_shape[0]) for j in range(map_shape[1])}
+        value = objective_function(np.array(violation_path).reshape(map_shape))
+
+        trial = optuna.trial.create_trial(
+            params=params,
+            distributions=distributions,
+            value=value,
+        )
+        study.add_trial(trial)
+
     logging.info(f"Created new study '{settings['name']}' in {settings['storage']}")
 
     study.optimize(objective_with_args, n_trials=settings["iter_bo"])
@@ -91,7 +107,8 @@ def run_bo(settings):
                 best_x[i, j] = study.best_params[f"x_{i}_{j}"]
         logging.info(f"Best Direction Matrix:\n{best_x}")
 
-    optuna.visualization.plot_optimization_history(study)
+    fig = optuna.visualization.plot_optimization_history(study)
+    fig.write_image("optimization_tpe.png")
 
 
 def parse_args():
@@ -99,6 +116,7 @@ def parse_args():
     parser.add_argument("--timestamp", type=str, help="Timestamp for the experiment.")
     parser.add_argument("--seed", type=int, default=0, help="Random seed for reproducibility.")
     parser.add_argument("--iter_bo", type=int, default=300, help="Number of iterations for Bayesian optimization.")
+    parser.add_argument("--n_init_violation_paths", type=int, default=10, help="Number of initial violation paths for Warcraft.")
     parser.add_argument("--acq_trade_off_param", type=float, default=3.0, help="Trade-off parameter for the acquisition function.")
     parser.add_argument("--acq_batch_size", type=int, default=10, help="Batch size for optimization.")
     parser.add_argument("--acq_maximize", action="store_true", help="Whether to maximize the acquisition function.")
@@ -165,6 +183,7 @@ if __name__ == "__main__":
         "function": args.function,
         "map": map_targeted,
         "iter_bo": args.iter_bo,
+        "n_init_violation_paths": args.n_init_violation_paths,
         "storage": storage_url,
         "sampler": sampler,
         "acqf_settings": {

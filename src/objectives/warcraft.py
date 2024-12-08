@@ -275,45 +275,74 @@ def build_constraint_warcraft(map_shape: tuple[int, int]) -> np.ndarray:
     return tensor_constraint
 
 
-# if __name__ == "__main__":
-#     import optuna
+class ConstraintWarcraft:
+    def __init__(self, map_shape: tuple[int, int]) -> None:
+        self.map_shape = map_shape
+        self.directions_dict = {
+            "oo": np.array([0, 0]),
+            "ab": np.array([1, 1]),
+            "ac": np.array([0, 2]),
+            "ad": np.array([1, 1]),
+            "bc": np.array([1, 1]),
+            "bd": np.array([2, 0]),
+            "cd": np.array([1, 1]),
+        }
+        self.directions_list = list(self.directions_dict.keys())
 
-#     # Initialize the WarcraftObjective with a sample weight matrix
-#     shape = (3, 3)
-#     weight_matrix = np.random.rand(*shape)
-#     weight_matrix /= np.sum(weight_matrix)
-#     objective_function = WarcraftObjective(weight_matrix)
+        self.tensor_constraint = self._build()
 
-#     def objective(trial):
-#         # Define the shape of the array (e.g., 3x3)
-#         x = np.empty(shape, dtype=object)
+    def _build(self) -> np.ndarray:
+        directions_dict = self.directions_dict
+        directions_list = self.directions_list
 
-#         directions = ["oo", "ab", "ac", "ad", "bc", "bd", "cd"]
+        # Map parameters
+        map_length = self.map_shape[0] * self.map_shape[1]
+        ideal_gain = (self.map_shape[0] + self.map_shape[1] - 1) * 2
 
-#         # Suggest values for each element in the array
-#         for i in range(shape[0]):
-#             for j in range(shape[1]):
-#                 x[i, j] = trial.suggest_categorical(f"x_{i}_{j}", directions)
+        # Initialize constraints as NumPy arrays
+        tensor_constraint_1 = np.zeros((len(directions_list),) * map_length)
+        tensor_constraint_2 = np.zeros((len(directions_list),) * map_length)
+        tensor_constraint_3 = np.zeros((len(directions_list),) * map_length)
 
-#         # Calculate the score using WarcraftObjective
-#         score = objective_function(x)
+        # Constraint 1: (0, 0) != "oo", "ab"
+        for direction in directions_list:
+            if direction not in ["oo", "ab"]:
+                tensor_constraint_1[directions_list.index(direction), ...] = 1
 
-#         # Since we want to minimize the score, return it directly
-#         return score
+        # Constraint 2: (map_shape[0] - 1, map_shape[1] - 1) != "oo", "cd"
+        for direction in directions_list:
+            if direction not in ["oo", "cd"]:
+                tensor_constraint_2[..., directions_list.index(direction)] = 1
 
-#     # Run the optimization using Optuna
-#     study = optuna.create_study(direction="minimize")
-#     study.optimize(objective, n_trials=100)
+        # Constraint 3: len[path] == map_shape[0] * map_shape[1]
+        for index, _ in np.ndenumerate(tensor_constraint_3):
+            gain = np.sum([directions_dict[directions_list[idx]].sum() for idx in index])
+            if gain == ideal_gain:
+                tensor_constraint_3[index] = 1
 
-#     # Print the best result
-#     print(f"Best value: {study.best_value}")
-#     print(f"Best params: {study.best_params}")
+        # Combine constraints with logical AND
+        tensor_constraint = np.logical_and(
+            tensor_constraint_1,
+            np.logical_and(tensor_constraint_2, tensor_constraint_3)
+        )
 
-#     # Visualize the best direction matrix
-#     best_x = np.empty((3, 3), dtype=object)
-#     for i in range(3):
-#         for j in range(3):
-#             best_x[i, j] = study.best_params[f"x_{i}_{j}"]
+        return tensor_constraint  
 
-#     print("\nBest Direction Matrix:")
-#     print(best_x)
+    def sample_violation_indices(self, num_samples: int) -> np.ndarray:
+        indices = np.array(np.where(self.tensor_constraint == 0)).T
+
+        if num_samples > len(indices):
+            raise ValueError("num_samples is too large")
+
+        random_indices = indices[np.random.choice(len(indices), size=num_samples, replace=False)]
+
+        return random_indices
+
+    def sample_violation_path(self, num_samples: int = 200) -> list[list[str]]:
+        random_indices = self.sample_violation_indices(num_samples)
+        random_paths = [list(self.directions_list[idx] for idx in index) for index in random_indices]
+
+        return random_paths
+
+
+
