@@ -22,7 +22,7 @@ class ParafacSampler(BaseSampler):
         unique_sampling: bool = False,
         decomp_iter_num: int = 5,
         include_observed_points: bool = False,
-        acquisition_function: Literal["ucb", "ei"] = "ucb",  # 追加: 獲得関数の選択
+        acquisition_function: Literal["ucb", "ei"] = "ucb",
         n_startup_trials: int = 1,
         tensor_constraint = None,
     ):
@@ -39,7 +39,7 @@ class ParafacSampler(BaseSampler):
         self.unique_sampling = unique_sampling
         self.decomp_iter_num = decomp_iter_num
         self.include_observed_points = include_observed_points
-        self.acquisition_function = acquisition_function  # 追加: 獲得関数の設定
+        self.acquisition_function = acquisition_function
         self.n_startup_trials = n_startup_trials
         self.independent_sampler = optuna.samplers.RandomSampler(seed=seed)
 
@@ -81,7 +81,7 @@ class ParafacSampler(BaseSampler):
         states = (TrialState.COMPLETE,)
         trials = study._get_trials(deepcopy=False, states=states, use_cache=True)
         
-        if len(trials) < self.n_startup_trials:  # Corrected attribute name
+        if len(trials) < self.n_startup_trials:
             return {}
 
         if self._param_names is None:
@@ -217,10 +217,11 @@ class ParafacSampler(BaseSampler):
 
     def _calculate_eval_stats(
         self, tensor_eval: np.ndarray
-    ) -> tuple[float, float, float, float]:
+    ) -> tuple[float, float]:
         eval_copy = np.copy(tensor_eval)
         # Filter with constraint
-        eval_copy[self._tensor_constraint == 0] = np.nan
+        if self._tensor_constraint is not None:
+            eval_copy[self._tensor_constraint == 0] = np.nan
 
         finite_values = eval_copy[np.isfinite(eval_copy)]
 
@@ -229,40 +230,28 @@ class ParafacSampler(BaseSampler):
             np.nanstd(finite_values),
         )
 
-    # def _select_mask_indices(
-    #     self, tensor_shape: tuple, tensor_eval_bool: np.ndarray
-    # ) -> np.ndarray:
-    #     cand_indices = (
-    #         np.indices(tensor_shape).reshape(len(tensor_shape), -1).T
-    #         if self.include_observed_points
-    #         else np.argwhere(tensor_eval_bool == False)
-    #     )
-
-    #     mask_size = max(1, int(len(cand_indices) * self.mask_ratio))
-    #     # return self.rng.choice(cand_indices, mask_size, replace=False)  # Use self.rng.choice instead of random.sample
-    #     return random.sample(list(cand_indices), mask_size)
-
     def _select_mask_indices(
         self, tensor_shape: tuple, tensor_eval_bool: np.ndarray
     ) -> np.ndarray:
-        # Get candidate indices where self._tensor_constraint is 1
-        constrained_indices = np.argwhere(self._tensor_constraint == 1)
+        if self._tensor_constraint is not None:
+            # Get candidate indices where self._tensor_constraint is 1
+            constrained_indices = np.argwhere(self._tensor_constraint == 1)
 
-        # Filter candidate indices based on whether to include observed points
-        if self.include_observed_points:
-            cand_indices = np.indices(tensor_shape).reshape(len(tensor_shape), -1).T
+            # Filter candidate indices based on whether to include observed points
+            if self.include_observed_points:
+                cand_indices = np.indices(tensor_shape).reshape(len(tensor_shape), -1).T
+            else:
+                cand_indices = np.argwhere(tensor_eval_bool == False)
+
+            # Intersect the constrained indices with the candidate indices
+            constrained_indices_set = set(map(tuple, constrained_indices))
+            cand_indices = np.array([idx for idx in cand_indices if tuple(idx) in constrained_indices_set])
         else:
-            cand_indices = np.argwhere(tensor_eval_bool == False)
-
-
-        # # Too slow ---------------------------------------------
-        # # Intersect the constrained indices with the candidate indices
-        # cand_indices = np.array([tuple(idx) for idx in cand_indices if tuple(idx) in map(tuple, constrained_indices)])
-        # # Too slow ---------------------------------------------
-
-        # Intersect the constrained indices with the candidate indices
-        constrained_indices_set = set(map(tuple, constrained_indices))
-        cand_indices = np.array([idx for idx in cand_indices if tuple(idx) in constrained_indices_set])
+            # If there is no tensor constraint, use all candidate indices
+            if self.include_observed_points:
+                cand_indices = np.indices(tensor_shape).reshape(len(tensor_shape), -1).T
+            else:
+                cand_indices = np.argwhere(tensor_eval_bool == False)
 
         # Determine the mask size
         mask_size = max(1, int(len(cand_indices) * self.mask_ratio))
@@ -302,12 +291,14 @@ class ParafacSampler(BaseSampler):
         init_tensor_eval = self.rng.normal(0, 1, tensor_eval.shape)
 
         # Assign observed values
-        condition = np.logical_and(tensor_eval_bool, self._tensor_constraint)
+        if self._tensor_constraint is not None:
+            condition = np.logical_and(tensor_eval_bool, self._tensor_constraint)
+        else:
+            condition = tensor_eval_bool
         init_tensor_eval[condition] = standardized_tensor_eval[condition]
 
         # Incorporate constraint 
         if self._tensor_constraint is not None:
-
             if maximize:
                 init_tensor_eval[self._tensor_constraint == 0] = np.nanmin(init_tensor_eval) - 1.0 * 1
             else:
@@ -360,23 +351,6 @@ class ParafacSampler(BaseSampler):
         batch_size: int,
         maximize: bool,
     ) -> list[tuple[int, ...]]:
-        # # Calculate overall mean and std stats for logging
-        # mean_stats = {
-        #     "Max": np.max(mean_tensor),
-        #     "Min": np.min(mean_tensor),
-        #     "Mean": np.mean(mean_tensor),
-        #     "Std": np.std(mean_tensor),
-        # }
-        # std_stats = {
-        #     "Max": np.max(std_tensor),
-        #     "Min": np.min(std_tensor),
-        #     "Mean": np.mean(std_tensor),
-        #     "Std": np.std(std_tensor),
-        # }
-
-        # logging.info(f"Candidate Mean Stats: {mean_stats}")
-        # logging.info(f"Candidate Std Stats: {std_stats}")
-
         # Define UCB calculation
         def _ucb(mean_tensor, std_tensor, trade_off_param, maximize=True) -> np.ndarray:
             mean_tensor = mean_tensor if maximize else -mean_tensor
@@ -402,20 +376,6 @@ class ParafacSampler(BaseSampler):
         batch_size: int,
         maximize: bool,
     ) -> list[tuple[int, ...]]:
-        # # Calculate overall mean and std stats for logging
-        # mean_stats = {
-        #     "Max": np.max(mean_tensor),
-        #     "Min": np.min(mean_tensor),
-        #     "Mean": np.mean(mean_tensor),
-        #     "Std": np.std(mean_tensor),
-        # }
-        # std_stats = {
-        #     "Max": np.max(std_tensor),
-        #     "Min": np.min(std_tensor),
-        #     "Mean": np.mean(std_tensor),
-        #     "Std": np.std(std_tensor),
-        # }
-
         # Define EI calculation
         def _ei(mean_tensor, std_tensor, f_best, maximize=True) -> np.ndarray:
             std_tensor = np.clip(std_tensor, 1e-9, None)

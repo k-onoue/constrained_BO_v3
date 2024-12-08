@@ -223,7 +223,8 @@ class TuckerSampler(BaseSampler):
     ) -> tuple[float, float, float, float]:
         eval_copy = np.copy(tensor_eval)
         # Filter with constraint
-        eval_copy[self._tensor_constraint == 0] = np.nan
+        if self._tensor_constraint is not None:
+            eval_copy[self._tensor_constraint == 0] = np.nan
 
         finite_values = eval_copy[np.isfinite(eval_copy)]
 
@@ -235,18 +236,25 @@ class TuckerSampler(BaseSampler):
     def _select_mask_indices(
         self, tensor_shape: tuple, tensor_eval_bool: np.ndarray
     ) -> np.ndarray:
-        # Get candidate indices where self._tensor_constraint is 1
-        constrained_indices = np.argwhere(self._tensor_constraint == 1)
+        if self._tensor_constraint is not None:
+            # Get candidate indices where self._tensor_constraint is 1
+            constrained_indices = np.argwhere(self._tensor_constraint == 1)
 
-        # Filter candidate indices based on whether to include observed points
-        if self.include_observed_points:
-            cand_indices = np.indices(tensor_shape).reshape(len(tensor_shape), -1).T
+            # Filter candidate indices based on whether to include observed points
+            if self.include_observed_points:
+                cand_indices = np.indices(tensor_shape).reshape(len(tensor_shape), -1).T
+            else:
+                cand_indices = np.argwhere(tensor_eval_bool == False)
+
+            # Intersect the constrained indices with the candidate indices
+            constrained_indices_set = set(map(tuple, constrained_indices))
+            cand_indices = np.array([idx for idx in cand_indices if tuple(idx) in constrained_indices_set])
         else:
-            cand_indices = np.argwhere(tensor_eval_bool == False)
-
-        # Intersect the constrained indices with the candidate indices
-        constrained_indices_set = set(map(tuple, constrained_indices))
-        cand_indices = np.array([idx for idx in cand_indices if tuple(idx) in constrained_indices_set])
+            # If there is no tensor constraint, use all candidate indices
+            if self.include_observed_points:
+                cand_indices = np.indices(tensor_shape).reshape(len(tensor_shape), -1).T
+            else:
+                cand_indices = np.argwhere(tensor_eval_bool == False)
 
         # Determine the mask size
         mask_size = max(1, int(len(cand_indices) * self.mask_ratio))
@@ -286,12 +294,14 @@ class TuckerSampler(BaseSampler):
         init_tensor_eval = self.rng.normal(0, 1, tensor_eval.shape)
 
         # Assign observed values
-        condition = np.logical_and(tensor_eval_bool, self._tensor_constraint)
+        if self._tensor_constraint is not None:
+            condition = np.logical_and(tensor_eval_bool, self._tensor_constraint)
+        else:
+            condition = tensor_eval_bool
         init_tensor_eval[condition] = standardized_tensor_eval[condition]
 
         # Incorporate constraint 
         if self._tensor_constraint is not None:
-
             if maximize:
                 init_tensor_eval[self._tensor_constraint == 0] = np.nanmin(init_tensor_eval) - 1.0 * 1
             else:

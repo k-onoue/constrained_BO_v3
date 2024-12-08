@@ -1,5 +1,7 @@
 #!/bin/bash
 
+EXE_FILE="experiments/benchmark-constrained.py"
+
 run_benchmark() {
     local function=$1
     local timestamp=$2
@@ -41,7 +43,8 @@ iter_bo=500
 n_startup_trials=1
 
 # Experiment configurations
-sampler_list=("tpe" "random" "gp")
+# sampler_list=("tpe" "random" "gp")
+sampler_list=("gp")
 # functions=("warcraft" "sphere" "ackley")  # Add "sphere" and "ackley" as needed
 functions=("warcraft")
 # dimensions=(2 3 4 5 6 7 8 9)
