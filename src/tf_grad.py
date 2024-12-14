@@ -163,30 +163,30 @@ class TensorFactorization:
 
 
 
-if __name__ == "__main__":
-    # Example Usage
-    torch.manual_seed(42)
-    I, J, K = 10, 8, 6
-    rank = 3
-    tensor = torch.randn(I, J, K)
-    mask = (torch.rand_like(tensor) > 0.2).float()
-    constraint = (torch.rand_like(tensor) > 0.5).float()
+# if __name__ == "__main__":
+#     # Example Usage
+#     torch.manual_seed(42)
+#     I, J, K = 10, 8, 6
+#     rank = 3
+#     tensor = torch.randn(I, J, K)
+#     mask = (torch.rand_like(tensor) > 0.2).float()
+#     constraint = (torch.rand_like(tensor) > 0.5).float()
 
-    # Perform CP decomposition
-    cp_decomp = TensorFactorization(tensor, rank=rank, method="cp", mask=mask, constraint=constraint)
-    factors_cp = cp_decomp.optimize()
+#     # Perform CP decomposition
+#     cp_decomp = TensorFactorization(tensor, rank=rank, method="cp", mask=mask, constraint=constraint)
+#     factors_cp = cp_decomp.optimize()
 
-    # Perform Tucker decomposition
-    tucker_decomp = TensorFactorization(tensor, rank=(3, 3, 3), method="tucker", mask=mask, constraint=constraint)
-    factors_tucker = tucker_decomp.optimize()
+#     # Perform Tucker decomposition
+#     tucker_decomp = TensorFactorization(tensor, rank=(3, 3, 3), method="tucker", mask=mask, constraint=constraint)
+#     factors_tucker = tucker_decomp.optimize()
 
-    # Perform Tensor Train decomposition
-    tt_decomp = TensorFactorization(tensor, rank=[1, 3, 3, 1], method="train", mask=mask, constraint=constraint)
-    factors_tt = tt_decomp.optimize()
+#     # Perform Tensor Train decomposition
+#     tt_decomp = TensorFactorization(tensor, rank=[1, 3, 3, 1], method="train", mask=mask, constraint=constraint)
+#     factors_tt = tt_decomp.optimize()
 
-    # Perform Ring decomposition
-    ring_decomp = TensorFactorization(tensor, rank=3, method="ring", mask=mask, constraint=constraint)
-    factors_ring = ring_decomp.optimize()
+#     # Perform Ring decomposition
+#     ring_decomp = TensorFactorization(tensor, rank=3, method="ring", mask=mask, constraint=constraint)
+#     factors_ring = ring_decomp.optimize()
 
 
 if __name__ == "__main__":
