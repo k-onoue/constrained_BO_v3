@@ -43,7 +43,7 @@ mkdir -p "$results_dir"
 cp "$0" "$results_dir"  # Copy script for reproducibility
 
 # General experiment parameters
-iter_bo=500
+iter_bo=2000
 n_startup_trials=1
 n_init_violation_paths=200  # Number of initial violation paths
 
