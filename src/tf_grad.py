@@ -152,8 +152,14 @@ class TensorFactorization:
             optimizer.step()
 
             # Monitor loss
-            print(f"Iteration {iteration + 1}, Loss: {loss.item():.6f}")
-            print(f"mse: {mse_loss.item():.6f}, constraint: {constraint_loss.item():.6f}, l2: {l2_loss.item():.6f}")
+            msg1 = f"Iteration {iteration + 1}, Loss: {loss.item():.6f}"
+            msg2 = f"mse: {mse_loss.item():.6f}, constraint: {constraint_loss.item():.6f}, l2: {l2_loss.item():.6f}"
+            if iteration == max_iter - 1:
+                logging.info(msg1)
+                logging.info(msg2)
+            else:
+                print(msg1)
+                print(msg2)
             if abs(prev_loss - loss.item()) < tol:
                 print("Converged.")
                 break
@@ -161,32 +167,6 @@ class TensorFactorization:
 
         return [factor.detach() for factor in params]
 
-
-
-# if __name__ == "__main__":
-#     # Example Usage
-#     torch.manual_seed(42)
-#     I, J, K = 10, 8, 6
-#     rank = 3
-#     tensor = torch.randn(I, J, K)
-#     mask = (torch.rand_like(tensor) > 0.2).float()
-#     constraint = (torch.rand_like(tensor) > 0.5).float()
-
-#     # Perform CP decomposition
-#     cp_decomp = TensorFactorization(tensor, rank=rank, method="cp", mask=mask, constraint=constraint)
-#     factors_cp = cp_decomp.optimize()
-
-#     # Perform Tucker decomposition
-#     tucker_decomp = TensorFactorization(tensor, rank=(3, 3, 3), method="tucker", mask=mask, constraint=constraint)
-#     factors_tucker = tucker_decomp.optimize()
-
-#     # Perform Tensor Train decomposition
-#     tt_decomp = TensorFactorization(tensor, rank=[1, 3, 3, 1], method="train", mask=mask, constraint=constraint)
-#     factors_tt = tt_decomp.optimize()
-
-#     # Perform Ring decomposition
-#     ring_decomp = TensorFactorization(tensor, rank=3, method="ring", mask=mask, constraint=constraint)
-#     factors_ring = ring_decomp.optimize()
 
 
 if __name__ == "__main__":
@@ -219,7 +199,6 @@ if __name__ == "__main__":
     rank = 3
     methods = ["cp", "tucker", "train", "ring"]
     modes = [2, 3, 4, 5, 6, 7, 8, 9]
-
 
 
     # 設定: ログファイル名とフォーマット
@@ -264,3 +243,30 @@ if __name__ == "__main__":
 
     benchmark_tf()
     print(f"Benchmarking completed. Results are saved in {log_filename}.")
+
+
+
+# if __name__ == "__main__":
+#     # Example Usage
+#     torch.manual_seed(42)
+#     I, J, K = 10, 8, 6
+#     rank = 3
+#     tensor = torch.randn(I, J, K)
+#     mask = (torch.rand_like(tensor) > 0.2).float()
+#     constraint = (torch.rand_like(tensor) > 0.5).float()
+
+#     # Perform CP decomposition
+#     cp_decomp = TensorFactorization(tensor, rank=rank, method="cp", mask=mask, constraint=constraint)
+#     factors_cp = cp_decomp.optimize()
+
+#     # Perform Tucker decomposition
+#     tucker_decomp = TensorFactorization(tensor, rank=(3, 3, 3), method="tucker", mask=mask, constraint=constraint)
+#     factors_tucker = tucker_decomp.optimize()
+
+#     # Perform Tensor Train decomposition
+#     tt_decomp = TensorFactorization(tensor, rank=[1, 3, 3, 1], method="train", mask=mask, constraint=constraint)
+#     factors_tt = tt_decomp.optimize()
+
+#     # Perform Ring decomposition
+#     ring_decomp = TensorFactorization(tensor, rank=3, method="ring", mask=mask, constraint=constraint)
+#     factors_ring = ring_decomp.optimize()
