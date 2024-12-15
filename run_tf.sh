@@ -15,6 +15,7 @@ run_experiment() {
     local constraint=$8
     local direction=$9
     local plot_save_dir=${10}
+    local decomp_parallel=${11}
 
     local cmd=(
         python3 "$EXE_FILE"
@@ -36,8 +37,8 @@ run_experiment() {
         --mask_ratio 0.9
         --n_startup_trials 10
         # Acquisition function parameters
-        --acquisition_function "ucb"
-        --acq_trade_off_param 3.0
+        --acquisition_function "ei"
+        --acq_trade_off_param 1.0
         # Other parameters
         --iter_bo 300
         --plot_save_dir "$plot_save_dir"
@@ -46,6 +47,7 @@ run_experiment() {
     # Add optional flags
     [ "$constraint" = true ] && cmd+=(--constraint)
     [ "$direction" = true ] && cmd+=(--direction)
+    [ "$decomp_parallel" = true ] && cmd+=(--decomp_parallel)
 
     echo "Running: ${cmd[*]}"
     "${cmd[@]}"
@@ -67,6 +69,7 @@ tf_fill_methods=("zero")
 seed_list=(0)
 constraint=true  # Use constraint for warcraft
 direction=false  # Minimize objective
+decomp_parallel=true  # Enable parallel decomposition
 
 # Run experiments
 for map_option in "${map_options[@]}"; do
@@ -76,7 +79,7 @@ for map_option in "${map_options[@]}"; do
                 for seed in "${seed_list[@]}"; do
                     run_experiment "$function" "$timestamp" "$seed" "$map_option" \
                         "$tf_method" "$tf_rank" "$tf_fill_method" \
-                        "$constraint" "$direction" "$plot_save_dir"
+                        "$constraint" "$direction" "$plot_save_dir" "$decomp_parallel"
                 done
             done
         done

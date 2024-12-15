@@ -1,5 +1,6 @@
 import logging
 import random
+from concurrent.futures import ThreadPoolExecutor
 from typing import Literal, Optional
 
 import numpy as np
@@ -11,7 +12,6 @@ from optuna.trial import TrialState
 from scipy.stats import norm
 
 from ..tf_grad import TensorFactorization
-
 
 
 class TFSampler(BaseSampler):
@@ -30,6 +30,7 @@ class TFSampler(BaseSampler):
         # Random seed
         self.seed = seed
         self.rng = np.random.RandomState(seed)
+        random.seed(seed)
         torch.manual_seed(seed)
 
         # Device and dtype
@@ -48,6 +49,7 @@ class TFSampler(BaseSampler):
         # Sampler parameters
         self.n_startup_trials = sampler_params.get("n_startup_trials", 1)
         self.decomp_iter_num = sampler_params.get("decomp_iter_num", 10)
+        self.decomp_parallel = sampler_params.get("decomp_parallel", False)
         self.mask_ratio = sampler_params.get("mask_ratio", 0.9)
         self.include_observed_points = sampler_params.get("include_observed_points", False)
         self.unique_sampling = sampler_params.get("unique_sampling", False)
@@ -117,6 +119,7 @@ class TFSampler(BaseSampler):
         mean_tensor, std_tensor = self._fit(
             self._tensor_eval,
             self._tensor_eval_bool,
+            parallel=self.decomp_parallel,
         )
 
         # Suggest next indices based on the selected acquisition function
@@ -214,28 +217,71 @@ class TFSampler(BaseSampler):
             np.save(filepath, tensor)
             print(f"Saved {name} for trial {trial_index} at {filepath}")
 
+    # def _fit(
+    #     self,
+    #     tensor_eval: np.ndarray,
+    #     tensor_eval_bool: np.ndarray,
+    # ) -> tuple[np.ndarray, np.ndarray]:
+    #     eval_mean, eval_std = self._calculate_eval_stats(
+    #         tensor_eval
+    #     )
+
+    #     tensors_list = [
+    #         self._decompose_with_optional_mask(
+    #             tensor_eval,
+    #             tensor_eval_bool,
+    #             eval_mean,
+    #             eval_std,
+    #             self._maximize
+    #         )
+    #         for _ in range(self.decomp_iter_num)
+    #     ]
+
+    #     return self._calculate_mean_std_tensors(
+    #         tensors_list, tensor_eval, tensor_eval_bool, self._maximize
+    #     )
+
     def _fit(
         self,
         tensor_eval: np.ndarray,
         tensor_eval_bool: np.ndarray,
+        parallel: bool = False,
     ) -> tuple[np.ndarray, np.ndarray]:
-        eval_mean, eval_std = self._calculate_eval_stats(
-            tensor_eval
-        )
+        eval_mean, eval_std = self._calculate_eval_stats(tensor_eval)
 
-        tensors_list = [
-            self._decompose_with_optional_mask(
-                tensor_eval,
-                tensor_eval_bool,
-                eval_mean,
-                eval_std,
-                self._maximize
-            )
-            for _ in range(self.decomp_iter_num)
-        ]
+        if parallel:
+            # Run decompositions in parallel using ThreadPoolExecutor
+            with ThreadPoolExecutor() as executor:
+                futures = [
+                    executor.submit(
+                        self._decompose_with_optional_mask,
+                        tensor_eval,
+                        tensor_eval_bool,
+                        eval_mean,
+                        eval_std,
+                        self._maximize
+                    ) 
+                    for _ in range(self.decomp_iter_num)
+                ]
+                tensors_list = [f.result() for f in futures]
+        else:
+            # Sequential execution
+            tensors_list = [
+                self._decompose_with_optional_mask(
+                    tensor_eval,
+                    tensor_eval_bool,
+                    eval_mean,
+                    eval_std,
+                    self._maximize
+                )
+                for _ in range(self.decomp_iter_num)
+            ]
 
         return self._calculate_mean_std_tensors(
-            tensors_list, tensor_eval, tensor_eval_bool, self._maximize
+            tensors_list,
+            tensor_eval,
+            tensor_eval_bool,
+            self._maximize
         )
 
     def _calculate_eval_stats(

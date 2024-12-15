@@ -109,7 +109,7 @@ def run_bo(settings):
     if settings.get("plot_save_dir"):
         fig = optuna.visualization.plot_optimization_history(study)
         plot_path = os.path.join(
-            settings["save_dir"], 
+            settings["plot_save_dir"], 
             f"{settings['name']}_optimization_history.png"
         )
         os.makedirs(os.path.dirname(plot_path), exist_ok=True)
@@ -140,6 +140,7 @@ def parse_args():
     
     # Sampler parameters
     parser.add_argument("--decomp_iter_num", type=int, default=10)
+    parser.add_argument("--decomp_parallel", action="store_true")
     parser.add_argument("--mask_ratio", type=float, default=0.9)
     parser.add_argument("--include_observed_points", action="store_true")
     parser.add_argument("--unique_sampling", action="store_true")

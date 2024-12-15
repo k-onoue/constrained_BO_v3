@@ -62,7 +62,7 @@ class TensorFactorization:
 
         # for logging
         self.loss = None
-        self.mse_loss = None
+        self.sse_loss = None
         self.constraint_loss = None
         self.l2_loss = None
 
@@ -132,24 +132,24 @@ class TensorFactorization:
             def loss_fn():
                 # Ensure tensors are on the same device
                 error_term = self.constraint * self.mask * (self.tensor - reconstruction)
-                mse_loss = torch.norm(error_term) ** 2
+                sse_loss = torch.norm(error_term) ** 2
                 violation_term = torch.clamp((1 - self.constraint) * reconstruction, min=0)
                 constraint_loss = constraint_lambda * torch.sum(violation_term)
                 l2_loss = reg_lambda * sum(torch.norm(factor) ** 2 for factor in params)
-                total_loss = mse_loss + constraint_loss + l2_loss
-                return total_loss, mse_loss, constraint_loss, l2_loss
+                total_loss = sse_loss + constraint_loss + l2_loss
+                return total_loss, sse_loss, constraint_loss, l2_loss
 
-            loss, mse_loss, constraint_loss, l2_loss = loss_fn()
+            loss, sse_loss, constraint_loss, l2_loss = loss_fn()
             loss.backward()
             optimizer.step()
 
             if iteration == max_iter - 1:
                 print(f"Iter: {iteration}, Loss: {loss}")
-                print(f"MSE: {mse_loss}, CONST: {constraint_loss}, L2: {l2_loss}")
+                print(f"SSE: {sse_loss}, CONST: {constraint_loss}, L2: {l2_loss}")
 
                 # for logging
                 self.loss = loss
-                self.mse_loss = mse_loss
+                self.sse_loss = sse_loss
                 self.constraint_loss = constraint_loss
                 self.l2_loss = l2_loss
 
