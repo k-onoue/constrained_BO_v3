@@ -335,7 +335,7 @@ class TFSampler(BaseSampler):
                 else:
                     init_tensor_eval[self._tensor_constraint == 0] = np.nanmax(init_tensor_eval) + 1.0
 
-        if self._tensor_constraint:
+        if self._tensor_constraint is not None:
             constraint = torch.tensor(self._tensor_constraint, dtype=self.torch_dtype)
         else:
             constraint = None

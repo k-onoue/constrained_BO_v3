@@ -6,31 +6,9 @@ from functools import partial
 import random
 import numpy as np
 import optuna
-from _src import TFSampler, WarcraftObjective, set_logger
-
-
-def sphere(x):
-    """
-    Computes the d-dimensional Sphere function.
-    :param x: np.array, shape (d,) - point at which to evaluate the function.
-    :return: float - value of the Sphere function at x.
-    """
-    return np.sum(x ** 2)
-
-
-def ackley(x):
-    """
-    Computes the d-dimensional Ackley function.
-    :param x: np.array, shape (d,) - point at which to evaluate the function.
-    :return: float - value of the Ackley function at x.
-    """
-    a = 20
-    b = 0.2
-    c = 2 * np.pi
-    d = len(x)
-    sum1 = -a * np.exp(-b * np.sqrt(np.sum(x ** 2) / d))
-    sum2 = -np.exp(np.sum(np.cos(c * x)) / d)
-    return sum1 + sum2 + a + np.exp(1)
+from _src import TFSampler, set_logger
+from _src import WarcraftObjective, ConstraintWarcraft, get_map
+from _src import sphere, ackley
 
 
 def objective(trial, dimension=None, function=None, map_shape=None, objective_function=None):
@@ -63,12 +41,22 @@ def run_bo(settings):
     function = settings["function"]
     
     if function in ["sphere", "ackley"]:
+        if settings["constraint"]:
+            raise ValueError("Constraint not supported for this function")
         dimension = settings["dimension"]
         objective_with_args = partial(objective, dimension=dimension, function=function)
     elif function == "warcraft":
         map_targeted = settings["map"]
         map_shape = map_targeted.shape
-        objective_function = WarcraftObjective(map_targeted)
+
+        if settings["constraint"]:
+            constriant_builder = ConstraintWarcraft(map_shape)
+            tensor_constraint = constriant_builder.tensor_constraint 
+            objective_function = WarcraftObjective(map_targeted, tensor_constraint)
+        else:
+            tensor_constraint = None
+            objective_function = WarcraftObjective(map_targeted)
+
         objective_with_args = partial(objective, map_shape=map_shape, objective_function=objective_function, function=function)
     else:
         raise ValueError(f"Unsupported function type: {function}")
@@ -95,7 +83,8 @@ def run_bo(settings):
         },
         acqf_params={
             "trade_off_param": settings["acqf_settings"]["trade_off_param"],
-        }
+        },
+        tensor_constraint=tensor_constraint
     )
 
     direction = "maximize" if settings["direction"] else "minimize"
@@ -116,7 +105,16 @@ def run_bo(settings):
                 best_x[i, j] = study.best_params[f"x_{i}_{j}"]
         print(f"Best Direction Matrix:\n{best_x}")
 
-    optuna.visualization.plot_optimization_history(study)
+    # Save optimization history plot if save_dir is provided
+    if settings.get("plot_save_dir"):
+        fig = optuna.visualization.plot_optimization_history(study)
+        plot_path = os.path.join(
+            settings["save_dir"], 
+            f"{settings['name']}_optimization_history.png"
+        )
+        os.makedirs(os.path.dirname(plot_path), exist_ok=True)
+        fig.write_image(plot_path)
+        logging.info(f"Saved optimization history plot to {plot_path}")
 
 def parse_args():
     parser = argparse.ArgumentParser(description="Bayesian Optimization with Tensor Factorization")
@@ -127,6 +125,7 @@ def parse_args():
     parser.add_argument("--dimension", type=int, default=2, help="Problem dimension")
     parser.add_argument("--function", type=str, choices=["sphere", "ackley", "warcraft"], default="sphere")
     parser.add_argument("--map_option", type=int, choices=[1, 2, 3], default=1)
+    parser.add_argument("--constraint", action="store_true", help="Use constraint in the objective function")
     parser.add_argument("--direction", action="store_true", help="Maximize the objective function")
 
     # TF-specific arguments
@@ -149,20 +148,11 @@ def parse_args():
     # Acquisition function arguments
     parser.add_argument("--acquisition_function", type=str, choices=["ucb", "ei"], default="ucb")
     parser.add_argument("--acq_trade_off_param", type=float, default=1.0)
+
+    # Save directory
+    parser.add_argument("--plot_save_dir", type=str, help="Directory to save the results")
     
     return parser.parse_args()
-
-
-def get_map(map_option: int):
-    if map_option == 1:
-        map_targeted = np.array([[1, 4], [2, 1]])
-    elif map_option == 2:
-        map_targeted = np.array([[1, 4, 1], [2, 1, 1]])
-    elif map_option == 3:
-        map_targeted = np.array([[1, 4, 1], [2, 1, 3], [5, 2, 1]])
-    else:
-        raise ValueError(f"Invalid map option: {map_option}")
-    return map_targeted / map_targeted.sum()
 
 
 
@@ -192,10 +182,12 @@ if __name__ == "__main__":
         "seed": args.seed,
         "dimension": args.dimension,
         "function": args.function,
+        "constraint": args.constraint,
         "direction": args.direction,
         "map": map_targeted,
         "iter_bo": args.iter_bo,
         "storage": storage_url,
+        "plot_save_dir": args.plot_save_dir,
         "tf_settings": {
             "method": args.tf_method,
             "rank": args.tf_rank,

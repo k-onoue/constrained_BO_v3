@@ -345,4 +345,13 @@ class ConstraintWarcraft:
         return random_paths
 
 
-
+def get_map(map_option: int):
+    if map_option == 1:
+        map_targeted = np.array([[1, 4], [2, 1]])
+    elif map_option == 2:
+        map_targeted = np.array([[1, 4, 1], [2, 1, 1]])
+    elif map_option == 3:
+        map_targeted = np.array([[1, 4, 1], [2, 1, 3], [5, 2, 1]])
+    else:
+        raise ValueError(f"Invalid map option: {map_option}")
+    return map_targeted / map_targeted.sum()

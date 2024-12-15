@@ -12,6 +12,9 @@ run_experiment() {
     local tf_method=$5
     local tf_rank=$6
     local tf_fill_method=$7
+    local constraint=$8
+    local direction=$9
+    local plot_save_dir=${10}
 
     local cmd=(
         python3 "$EXE_FILE"
@@ -19,11 +22,10 @@ run_experiment() {
         --function "$function"
         --seed "$seed"
         --map_option "$map_option"
+        # TF parameters
         --tf_method "$tf_method"
         --tf_rank "$tf_rank"
         --tf_fill_method "$tf_fill_method"
-        --iter_bo 300
-        # TF parameters
         --tf_lr 0.01
         --tf_max_iter 1000
         --tf_tol 1e-5
@@ -36,7 +38,14 @@ run_experiment() {
         # Acquisition function parameters
         --acquisition_function "ucb"
         --acq_trade_off_param 3.0
+        # Other parameters
+        --iter_bo 300
+        --plot_save_dir "$plot_save_dir"
     )
+
+    # Add optional flags
+    [ "$constraint" = true ] && cmd+=(--constraint)
+    [ "$direction" = true ] && cmd+=(--direction)
 
     echo "Running: ${cmd[*]}"
     "${cmd[@]}"
@@ -45,7 +54,8 @@ run_experiment() {
 # Initialize timestamp
 timestamp=$(date +"%Y-%m-%d_%H-%M-%S")
 results_dir="results/$timestamp"
-mkdir -p "$results_dir"
+plot_save_dir="$results_dir/temp_plots"
+mkdir -p "$results_dir" "$plot_save_dir"
 cp "$0" "$results_dir"
 
 # Experiment configurations
@@ -55,6 +65,8 @@ tf_methods=("cp")
 tf_ranks=(3)
 tf_fill_methods=("zero")
 seed_list=(0)
+constraint=true  # Use constraint for warcraft
+direction=false  # Minimize objective
 
 # Run experiments
 for map_option in "${map_options[@]}"; do
@@ -63,7 +75,8 @@ for map_option in "${map_options[@]}"; do
             for tf_fill_method in "${tf_fill_methods[@]}"; do
                 for seed in "${seed_list[@]}"; do
                     run_experiment "$function" "$timestamp" "$seed" "$map_option" \
-                        "$tf_method" "$tf_rank" "$tf_fill_method"
+                        "$tf_method" "$tf_rank" "$tf_fill_method" \
+                        "$constraint" "$direction" "$plot_save_dir"
                 done
             done
         done
