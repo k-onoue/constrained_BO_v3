@@ -97,7 +97,7 @@ def run_bo(settings):
     )
 
     study.optimize(objective_with_args, n_trials=settings["iter_bo"])
-
+    
     if function == "warcraft":
         best_x = np.empty(map_shape, dtype=object)
         for i in range(map_shape[0]):

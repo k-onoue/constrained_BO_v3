@@ -62,9 +62,10 @@ class TensorFactorization:
 
         # for logging
         self.loss = None
-        self.sse_loss = None
+        self.mse_loss = None
         self.constraint_loss = None
         self.l2_loss = None
+        self.iter_end = None
 
         print(f"Initialized {method} decomposition with rank {rank} on device {self.device}.")
         print(f"Total parameters: {self.total_params}")
@@ -106,13 +107,13 @@ class TensorFactorization:
             result = result.reshape(self.tensor.shape)
             return result
 
-    def optimize(self, lr=0.01, max_iter=1000, tol=1e-6, reg_lambda=0.01, constraint_lambda=1):
+    def optimize(self, lr=0.01, max_iter=None, tol=1e-6, reg_lambda=0.01, constraint_lambda=1, verbose=True):
         """
         Perform optimization for the specified decomposition method.
 
         Args:
         - lr: float, learning rate.
-        - max_iter: int, maximum number of iterations.
+        - max_iter: int or None, maximum number of iterations (if None, use tol for convergence).
         - tol: float, tolerance for convergence.
         - reg_lambda: float, regularization coefficient for L2 regularization.
         - constraint_lambda: float, penalty coefficient for constraint violations.
@@ -124,39 +125,54 @@ class TensorFactorization:
         optimizer = optim.Adam(params, lr=lr)
         prev_loss = float('inf')
 
-        for iteration in range(max_iter):
+        iteration = 0
+        while True:
             optimizer.zero_grad()
 
             reconstruction = self.reconstruct()
 
             def loss_fn():
-                # Ensure tensors are on the same device
+                n_se = torch.sum(self.mask)
+                n_c = torch.sum(1 - self.constraint)
+                n_c = n_c if n_c > 0 else 1
+                
                 error_term = self.constraint * self.mask * (self.tensor - reconstruction)
-                sse_loss = torch.norm(error_term) ** 2
-                violation_term = torch.clamp((1 - self.constraint) * reconstruction, min=0)
-                constraint_loss = constraint_lambda * torch.sum(violation_term)
-                l2_loss = reg_lambda * sum(torch.norm(factor) ** 2 for factor in params)
-                total_loss = sse_loss + constraint_loss + l2_loss
-                return total_loss, sse_loss, constraint_loss, l2_loss
+                mse_loss = torch.norm(error_term) ** 2 / n_se if n_se > 0 else 0
+                
+                violation_term = torch.clamp((1 - self.constraint) * (reconstruction - self.tensor), min=0)
+                constraint_loss = constraint_lambda * torch.sum(violation_term) / n_c
+                
+                l2_loss = sum(torch.norm(factor) ** 2 / torch.numel(factor) for factor in params)
+                l2_loss *= reg_lambda
+                
+                total_loss = mse_loss + constraint_loss + l2_loss
+                
+                return total_loss, mse_loss, constraint_loss, l2_loss
 
-            loss, sse_loss, constraint_loss, l2_loss = loss_fn()
+            loss, mse_loss, constraint_loss, l2_loss = loss_fn()
             loss.backward()
             optimizer.step()
 
-            if iteration == max_iter - 1:
+            # Logging
+            self.loss = loss
+            self.mse_loss = mse_loss
+            self.constraint_loss = constraint_loss
+            self.l2_loss = l2_loss
+            
+            if verbose:
                 print(f"Iter: {iteration}, Loss: {loss}")
-                print(f"SSE: {sse_loss}, CONST: {constraint_loss}, L2: {l2_loss}")
-
-                # for logging
-                self.loss = loss
-                self.sse_loss = sse_loss
-                self.constraint_loss = constraint_loss
-                self.l2_loss = l2_loss
+                print(f"MSE: {mse_loss}, CONST: {constraint_loss}, L2: {l2_loss}")
 
             if abs(prev_loss - loss.item()) < tol:
                 print("Converged.")
                 break
-            prev_loss = loss.item()
+            
+            if max_iter is not None and iteration == max_iter - 1:
+                break
 
+            prev_loss = loss.item()
+            iteration += 1
+
+        self.iter_end = iteration
 
         return [factor.detach() for factor in params]

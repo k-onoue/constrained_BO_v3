@@ -21,14 +21,12 @@ run_experiment() {
         python3 "$EXE_FILE"
         --timestamp "$timestamp"
         --function "$function"
-        --seed "$seed"
-        --map_option "$map_option"
         # TF parameters
         --tf_method "$tf_method"
         --tf_rank "$tf_rank"
         --tf_fill_method "$tf_fill_method"
         --tf_lr 0.01
-        --tf_max_iter 1000
+        --tf_max_iter 50000
         --tf_tol 1e-5
         --tf_reg_lambda 1e-3
         --tf_constraint_lambda 1.0
@@ -40,7 +38,7 @@ run_experiment() {
         --acquisition_function "ei"
         --acq_trade_off_param 1.0
         # Other parameters
-        --iter_bo 300
+        --iter_bo 3000
         --plot_save_dir "$plot_save_dir"
     )
 
@@ -67,7 +65,7 @@ tf_methods=("cp")
 tf_ranks=(3)
 tf_fill_methods=("zero")
 seed_list=(0)
-constraint=true  # Use constraint for warcraft
+constraint=false  # Use constraint for warcraft
 direction=false  # Minimize objective
 decomp_parallel=true  # Enable parallel decomposition
 

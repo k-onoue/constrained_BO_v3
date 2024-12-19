@@ -67,7 +67,7 @@ class TFSampler(BaseSampler):
         self.tol = tf_params.get("tol", 1e-5)
         self.reg_lambda = tf_params.get("reg_lambda", 1e-3)
         self.constraint_lambda = tf_params.get("constraint_lambda", 1.0)
-        self.fill_constraint_method = tf_params.get("fill_constraint_method", "zero") # zero, normal or minmax
+        # self.fill_constraint_method = tf_params.get("fill_constraint_method", "zero") # zero, normal or minmax
 
         # Internal storage
         self._param_names = None
@@ -366,20 +366,25 @@ class TFSampler(BaseSampler):
             condition = tensor_eval_bool
         init_tensor_eval[condition] = standardized_tensor_eval[condition]
 
-        # Incorporate constraint based on method
-        if self._tensor_constraint is not None:
-            if self.fill_constraint_method == "zero":
-                # Fill constrained values with zeros
-                init_tensor_eval[self._tensor_constraint == 0] = 0.0
-            if self.fill_constraint_method == "normal":
-                # Fill constrained values with random normal samples
-                init_tensor_eval[self._tensor_constraint == 0] = self.rng.normal(0, 1, np.sum(self._tensor_constraint == 0))
-            elif self.fill_constraint_method == "minmax":
-                # Fill constrained values based on min/max
-                if maximize:
-                    init_tensor_eval[self._tensor_constraint == 0] = np.nanmin(init_tensor_eval) - 1.0
-                else:
-                    init_tensor_eval[self._tensor_constraint == 0] = np.nanmax(init_tensor_eval) + 1.0
+        # # Incorporate constraint based on method
+        # if self._tensor_constraint is not None:
+        #     if self.fill_constraint_method == "zero":
+        #         # Fill constrained values with zeros
+        #         init_tensor_eval[self._tensor_constraint == 0] = 0.0
+        #     if self.fill_constraint_method == "normal":
+        #         # Fill constrained values with random normal samples
+        #         init_tensor_eval[self._tensor_constraint == 0] = self.rng.normal(0, 1, np.sum(self._tensor_constraint == 0))
+        #     elif self.fill_constraint_method == "minmax":
+        #         # Fill constrained values based on min/max
+        #         if maximize:
+        #             init_tensor_eval[self._tensor_constraint == 0] = np.nanmin(init_tensor_eval) - 1.0
+        #         else:
+        #             init_tensor_eval[self._tensor_constraint == 0] = np.nanmax(init_tensor_eval) + 1.0
+
+        if maximize:
+            init_tensor_eval[self._tensor_constraint == 0] = np.nanmin(init_tensor_eval) - 1.0
+        else:
+            init_tensor_eval[self._tensor_constraint == 0] = np.nanmax(init_tensor_eval) + 1.0
 
         if self._tensor_constraint is not None:
             constraint = torch.tensor(self._tensor_constraint, dtype=self.torch_dtype)
@@ -419,12 +424,16 @@ class TFSampler(BaseSampler):
         mean_tensor[tensor_eval_bool] = tensor_eval[tensor_eval_bool]
         std_tensor[tensor_eval_bool] = 0
 
-        if self._tensor_constraint is not None:
-            # if maximize:
-            #     mean_tensor[self._tensor_constraint == 0] = np.min(mean_tensor) - 1.0
-            # else:
-            #     mean_tensor[self._tensor_constraint == 0] = np.max(mean_tensor) + 1.0
+        # if self._tensor_constraint is not None:
+        #     # if maximize:
+        #     #     mean_tensor[self._tensor_constraint == 0] = np.min(mean_tensor) - 1.0
+        #     # else:
+        #     #     mean_tensor[self._tensor_constraint == 0] = np.max(mean_tensor) + 1.0
                 
+        #     std_tensor[self._tensor_constraint == 0] = 0
+
+        if self._tensor_constraint is not None:
+            
             std_tensor[self._tensor_constraint == 0] = 0
 
         # Debugging
