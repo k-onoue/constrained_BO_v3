@@ -107,7 +107,7 @@ class TensorFactorization:
             result = result.reshape(self.tensor.shape)
             return result
 
-    def optimize(self, lr=0.01, max_iter=None, tol=1e-6, reg_lambda=0.01, constraint_lambda=1, verbose=True):
+    def optimize(self, lr=0.01, max_iter=None, tol=1e-6, reg_lambda=0.01, constraint_lambda=1, verbose=False):
         """
         Perform optimization for the specified decomposition method.
 

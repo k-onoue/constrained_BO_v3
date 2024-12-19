@@ -79,7 +79,7 @@ def run_bo(settings):
             "tol": settings["tf_settings"]["optim_params"]["tol"],
             "reg_lambda": settings["tf_settings"]["optim_params"]["reg_lambda"],
             "constraint_lambda": settings["tf_settings"]["optim_params"]["constraint_lambda"],
-            "fill_constraint_method": settings["tf_settings"]["optim_params"]["fill_constraint_method"],
+            # "fill_constraint_method": settings["tf_settings"]["optim_params"]["fill_constraint_method"],
         },
         acqf_params={
             "trade_off_param": settings["acqf_settings"]["trade_off_param"],
@@ -132,11 +132,11 @@ def parse_args():
     parser.add_argument("--tf_method", type=str, choices=["cp", "tucker", "train", "ring"], default="cp")
     parser.add_argument("--tf_rank", type=int, default=3, help="Tensor rank")
     parser.add_argument("--tf_lr", type=float, default=0.01, help="Learning rate")
-    parser.add_argument("--tf_max_iter", type=int, default=1000, help="Max iterations")
+    parser.add_argument("--tf_max_iter", type=int, default=None, help="Max iterations")
     parser.add_argument("--tf_tol", type=float, default=1e-5, help="Convergence tolerance")
     parser.add_argument("--tf_reg_lambda", type=float, default=1e-3, help="Regularization strength")
     parser.add_argument("--tf_constraint_lambda", type=float, default=1.0, help="Constraint penalty")
-    parser.add_argument("--tf_fill_method", type=str, choices=["zero", "normal", "minmax"], default="zero")
+    # parser.add_argument("--tf_fill_method", type=str, choices=["zero", "normal", "minmax"], default="zero")
     
     # Sampler parameters
     parser.add_argument("--decomp_iter_num", type=int, default=10)
@@ -198,7 +198,7 @@ if __name__ == "__main__":
                 "tol": args.tf_tol,
                 "reg_lambda": args.tf_reg_lambda,
                 "constraint_lambda": args.tf_constraint_lambda,
-                "fill_constraint_method": args.tf_fill_method,
+                # "fill_constraint_method": args.tf_fill_method,
             }
         },
         "acqf_settings": {
@@ -211,6 +211,7 @@ if __name__ == "__main__":
             "include_observed_points": args.include_observed_points,
             "unique_sampling": args.unique_sampling,
             "n_startup_trials": args.n_startup_trials,
+            "parallel": args.decomp_parallel,
         },
     }
 

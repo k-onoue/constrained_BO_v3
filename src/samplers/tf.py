@@ -63,8 +63,8 @@ class TFSampler(BaseSampler):
         # self.method = tf_params.get("method", "cp")
         self.rank = tf_params.get("rank", 3)
         self.lr = tf_params.get("lr", 0.01)
-        self.max_iter = tf_params.get("max_iter", 1000)
-        self.tol = tf_params.get("tol", 1e-5)
+        self.max_iter = tf_params.get("max_iter", None)
+        self.tol = tf_params.get("tol", 1e-6)
         self.reg_lambda = tf_params.get("reg_lambda", 1e-3)
         self.constraint_lambda = tf_params.get("constraint_lambda", 1.0)
         # self.fill_constraint_method = tf_params.get("fill_constraint_method", "zero") # zero, normal or minmax
@@ -405,6 +405,7 @@ class TFSampler(BaseSampler):
             tol=self.tol,
             reg_lambda=self.reg_lambda,
             constraint_lambda=self.constraint_lambda,
+            verbose=False,
         )
         reconstructed_tensor = tf.reconstruct()
 
@@ -424,16 +425,12 @@ class TFSampler(BaseSampler):
         mean_tensor[tensor_eval_bool] = tensor_eval[tensor_eval_bool]
         std_tensor[tensor_eval_bool] = 0
 
-        # if self._tensor_constraint is not None:
-        #     # if maximize:
-        #     #     mean_tensor[self._tensor_constraint == 0] = np.min(mean_tensor) - 1.0
-        #     # else:
-        #     #     mean_tensor[self._tensor_constraint == 0] = np.max(mean_tensor) + 1.0
-                
-        #     std_tensor[self._tensor_constraint == 0] = 0
-
         if self._tensor_constraint is not None:
-            
+            # if maximize:
+            #     mean_tensor[self._tensor_constraint == 0] = np.min(mean_tensor) - 1.0
+            # else:
+            #     mean_tensor[self._tensor_constraint == 0] = np.max(mean_tensor) + 1.0
+                
             std_tensor[self._tensor_constraint == 0] = 0
 
         # Debugging
