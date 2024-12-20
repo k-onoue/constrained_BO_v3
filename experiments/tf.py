@@ -94,6 +94,7 @@ def run_bo(settings):
         sampler=sampler,
         direction=direction,
         storage=settings["storage"],
+        load_if_exists=True,
     )
 
     study.optimize(objective_with_args, n_trials=settings["iter_bo"])

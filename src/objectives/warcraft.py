@@ -354,4 +354,12 @@ def get_map(map_option: int):
         map_targeted = np.array([[1, 4, 1], [2, 1, 3], [5, 2, 1]])
     else:
         raise ValueError(f"Invalid map option: {map_option}")
+    
+    # print()
+    # print()
+    # print(f"map_option: {map_option}")
+    # print(f"map_targeted: {map_targeted}")
+    # print()
+    # print()
+
     return map_targeted / map_targeted.sum()
