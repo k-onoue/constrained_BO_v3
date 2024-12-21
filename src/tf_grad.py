@@ -107,7 +107,7 @@ class TensorFactorization:
             result = result.reshape(self.tensor.shape)
             return result
 
-    def optimize(self, lr=0.01, max_iter=None, tol=1e-6, reg_lambda=0.01, constraint_lambda=1, verbose=False):
+    def optimize(self, lr=0.01, max_iter=None, tol=1e-6, mse_tol=1e-1, const_tol=1e-1, reg_lambda=0.0, constraint_lambda=1, verbose=False):
         """
         Perform optimization for the specified decomposition method.
 
@@ -115,6 +115,8 @@ class TensorFactorization:
         - lr: float, learning rate.
         - max_iter: int or None, maximum number of iterations (if None, use tol for convergence).
         - tol: float, tolerance for convergence.
+        - mse_tol: float, tolerance for MSE loss convergence.
+        - const_tol: float, tolerance for constraint loss convergence.
         - reg_lambda: float, regularization coefficient for L2 regularization.
         - constraint_lambda: float, penalty coefficient for constraint violations.
 
@@ -163,8 +165,14 @@ class TensorFactorization:
                 print(f"Iter: {iteration}, Loss: {loss}")
                 print(f"MSE: {mse_loss}, CONST: {constraint_loss}, L2: {l2_loss}")
 
+            # Convergence check based on mse_tol and const_tol
+            if mse_loss < mse_tol and constraint_loss < const_tol:
+                print("Converged based on MSE and constraint loss tolerance.")
+                break
+
+            # Convergence check based on overall loss difference
             if abs(prev_loss - loss.item()) < tol:
-                print("Converged.")
+                print("Converged based on total loss tolerance.")
                 break
             
             if max_iter is not None and iteration == max_iter - 1:
