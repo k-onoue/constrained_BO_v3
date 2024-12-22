@@ -112,7 +112,16 @@ def run_bo(settings):
                 best_x[i, j] = study.best_params[f"x_{i}_{j}"]
         logging.info(f"Best Direction Matrix:\n{best_x}")
 
-    optuna.visualization.plot_optimization_history(study)
+    # Save optimization history plot if save_dir is provided
+    if settings.get("plot_save_dir"):
+        fig = optuna.visualization.plot_optimization_history(study)
+        plot_path = os.path.join(
+            settings["plot_save_dir"], 
+            f"{settings['name']}_optimization_history.png"
+        )
+        os.makedirs(os.path.dirname(plot_path), exist_ok=True)
+        fig.write_image(plot_path)
+        logging.info(f"Saved optimization history plot to {plot_path}")
 
 
 def parse_args():
@@ -134,7 +143,11 @@ def parse_args():
     parser.add_argument("--unique_sampling", action="store_true", help="Whether to use unique sampling in the ParafacSampler.")
     parser.add_argument("--include_observed_points", action="store_true", help="Whether to include observed points for masking in the ParafacSampler.")
     parser.add_argument("--n_startup_trials", type=int, default=10, help="Number of initial trials for the optimization process.")
-    parser.add_argument("--acquisition_function", type=str, choices=["ucb", "ei"], default="ucb", help="Acquisition function to use.")
+    parser.add_argument("--acquisition_function", type=str, choices=["ucb", "ei", "ts"], default="ucb", help="Acquisition function to use.") 
+
+    # Save directory
+    parser.add_argument("--plot_save_dir", type=str, help="Directory to save the results")
+    
     return parser.parse_args()
 
 
@@ -173,6 +186,7 @@ if __name__ == "__main__":
 
     settings = {
         "name": f"{timestamp}_{log_filename_base}",
+        "plot_save_dir": args.plot_save_dir,
         "seed": args.seed,
         "dimension": args.dimension,
         "function": args.function,

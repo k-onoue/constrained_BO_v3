@@ -3,7 +3,6 @@
 # File to execute
 EXE_FILE="experiments/parafac.py"
 
-# Function to run the experiment
 run_experiment() {
     local function=$1
     local timestamp=$2
@@ -22,8 +21,8 @@ run_experiment() {
     local unique_sampling=${15}
     local include_observed_points=${16}
     local acquisition_function=${17}
+    local plot_save_dir=${18}
 
-    # Build the command
     local cmd=(
         python3 "$EXE_FILE"
         --timestamp "$timestamp"
@@ -39,44 +38,50 @@ run_experiment() {
         --cp_mask_ratio "$cp_mask_ratio"
         --n_startup_trials "$n_startup_trials"
         --acquisition_function "$acquisition_function"
+        --decomp_num "$decomp_num"
+        --plot_save_dir "$exp_dir"
     )
 
-    # Add optional flags if enabled
     [ "$acq_maximize" = true ] && cmd+=(--acq_maximize)
     [ "$unique_sampling" = true ] && cmd+=(--unique_sampling)
     [ "$include_observed_points" = true ] && cmd+=(--include_observed_points)
 
-    # Execute the command in the background
-    "${cmd[@]}" &
+    echo "Running experiment in $exp_dir"
+    "${cmd[@]}" 2>&1 | tee "$exp_dir/experiment.log" &
 }
 
-# Initialize timestamp and results directory
+# Initialize directories
 timestamp=$(date +"%Y-%m-%d_%H-%M-%S")
 results_dir="results/$timestamp"
-mkdir -p "$results_dir"
-cp "$0" "$results_dir"  # Copy script for reproducibility
+plot_save_dir="$results_dir/plots"
+mkdir -p "$results_dir" "$plot_save_dir"
+cp "$0" "$results_dir"
 
 # Experiment parameters
+functions=("warcraft")
+dimensions=(4)
+map_options=(1)
+seed_list=(0 1 2 3 4 5 6 7 8 9)
+iter_bo=2000
+
+# CP decomposition parameters
 cp_rank=3
+cp_als_iterations=100
 cp_mask_ratio=0.9
 decomp_num=10
-acquisition_function="ei"  # "ei" or "ucb"
+
+# Acquisition function parameters
+acquisition_function="ts"
 acq_trade_off_param=1.0
 acq_batch_size=1
 acq_maximize=false
-cp_als_iterations=100
+
+# Sampling parameters
 n_startup_trials=1
 unique_sampling=false
 include_observed_points=false
-iter_bo=2000
 
-# Functions, dimensions, and seeds
-functions=("warcraft")
-dimensions=(4)
-map_options=(1 2)
-seed_list=(0 1 2 3 4 5 6 7 8 9)
-
-# Run experiments for each function
+# Run experiments
 for function in "${functions[@]}"; do
     case $function in
         "sphere" | "ackley")
@@ -86,9 +91,9 @@ for function in "${functions[@]}"; do
                         "$acq_trade_off_param" "$acq_batch_size" "$acq_maximize" \
                         "$cp_rank" "$cp_als_iterations" "$cp_mask_ratio" \
                         "$decomp_num" "$n_startup_trials" \
-                        "$unique_sampling" "$include_observed_points" "$acquisition_function"
+                        "$unique_sampling" "$include_observed_points" \
+                        "$acquisition_function" "$plot_save_dir"
                 done
-                # Wait for current dimension experiments to finish
                 wait
             done
             ;;
@@ -99,18 +104,23 @@ for function in "${functions[@]}"; do
                         "$acq_trade_off_param" "$acq_batch_size" "$acq_maximize" \
                         "$cp_rank" "$cp_als_iterations" "$cp_mask_ratio" \
                         "$decomp_num" "$n_startup_trials" \
-                        "$unique_sampling" "$include_observed_points" "$acquisition_function"
+                        "$unique_sampling" "$include_observed_points" \
+                        "$acquisition_function" "$plot_save_dir"
                 done
-                # Wait for current map option experiments to finish
                 wait
             done
             ;;
     esac
 done
 
-# Wait for all background processes to complete
-wait
+# Record completion and parameters
+cat > "$results_dir/experiment_config.txt" << EOL
+Timestamp: $timestamp
+Functions: ${functions[*]}
+CP rank: $cp_rank
+CP mask ratio: $cp_mask_ratio
+Acquisition function: $acquisition_function
+Completed: $(date)
+EOL
 
-# Record completion
-completion_file="$results_dir/completion.txt"
-echo "All tasks completed at $(date)" > "$completion_file"
+echo "All experiments completed!"
