@@ -13,8 +13,10 @@ run_experiment() {
     local plot_save_dir=$8
     local decomp_parallel=$9
     local tf_max_iter=${10}
-    local n_startup_trials=${11}  # Added
-    local iter_bo=${12}          # Added
+    local n_startup_trials=${11}
+    local iter_bo=${12}
+    local acquisition_function=${13}
+    local mask_ratio=${14}
 
     local cmd=(
         python3 "$EXE_FILE"
@@ -31,17 +33,16 @@ run_experiment() {
         --tf_constraint_lambda 3.0
         # Sampler parameters
         --decomp_iter_num 10
-        --mask_ratio 0.9
-        --n_startup_trials "$n_startup_trials"  # Use parameter
+        --mask_ratio "$mask_ratio"
+        --n_startup_trials "$n_startup_trials"
         # Acquisition function parameters
-        --acquisition_function "ei"
+        --acquisition_function "$acquisition_function"
         --acq_trade_off_param 1.0
         # Other parameters
-        --iter_bo "$iter_bo"  # Use parameter
+        --iter_bo "$iter_bo"
         --plot_save_dir "$plot_save_dir"
     )
 
-    # Add optional flags
     [ "$tf_max_iter" != "None" ] && cmd+=(--tf_max_iter "$tf_max_iter")
     [ "$constraint" = true ] && cmd+=(--constraint)
     [ "$direction" = true ] && cmd+=(--direction)
@@ -60,16 +61,22 @@ cp "$0" "$results_dir"
 
 # Experiment configurations
 map_options=(1)
+# seed_list=(0 1 2 3 4 5 6 7 8 9)
+seed_list=(0 1)
+
+# Algorithm parameters
 tf_methods=("cp")
 tf_ranks=(3)
-seed_list=(0 1 2)
-constraint=true
-direction=false
-decomp_parallel=true
+acquisition_function="ts"
+mask_ratio=0.9
 tf_max_iter="None"
 
-n_startup_trials=1  # Added
-iter_bo=200        # Added
+# Flags and other settings
+constraint=false
+direction=false
+decomp_parallel=true
+n_startup_trials=1
+iter_bo=500
 
 # Run experiments
 for map_option in "${map_options[@]}"; do
@@ -80,7 +87,8 @@ for map_option in "${map_options[@]}"; do
                     "$tf_method" "$tf_rank" \
                     "$constraint" "$direction" "$plot_save_dir" \
                     "$decomp_parallel" "$tf_max_iter" \
-                    "$n_startup_trials" "$iter_bo" &
+                    "$n_startup_trials" "$iter_bo" \
+                    "$acquisition_function" "$mask_ratio" &
             done
             wait
         done

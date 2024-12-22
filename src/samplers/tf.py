@@ -19,7 +19,7 @@ class TFSampler(BaseSampler):
         self,
         seed: Optional[int] = None,
         method: Literal["cp", "tucker", "train", "ring"] = "cp",
-        acquisition_function: Literal["ucb", "ei"] = "ucb",
+        acquisition_function: Literal["ucb", "ei", "ts"] = "ucb",
         sampler_params: dict = {},
         tf_params: dict = {},
         acqf_params: dict = {},
@@ -48,7 +48,7 @@ class TFSampler(BaseSampler):
 
         # Sampler parameters
         self.n_startup_trials = sampler_params.get("n_startup_trials", 1)
-        self.decomp_iter_num = sampler_params.get("decomp_iter_num", 10)
+        self.decomp_iter_num = sampler_params.get("decomp_iter_num", 10) if self.acquisition_function != "ts" else 1
         self.decomp_parallel = sampler_params.get("decomp_parallel", False)
         self.mask_ratio = sampler_params.get("mask_ratio", 0.9)
         self.include_observed_points = sampler_params.get("include_observed_points", False)
@@ -67,7 +67,6 @@ class TFSampler(BaseSampler):
         self.tol = tf_params.get("tol", 1e-6)
         self.reg_lambda = tf_params.get("reg_lambda", 1e-3)
         self.constraint_lambda = tf_params.get("constraint_lambda", 1.0)
-        # self.fill_constraint_method = tf_params.get("fill_constraint_method", "zero") # zero, normal or minmax
 
         # Internal storage
         self._param_names = None
@@ -138,6 +137,13 @@ class TFSampler(BaseSampler):
                 batch_size=self.batch_size,
                 maximize=self._maximize,
             )
+        elif self.acquisition_function == "ts":
+            next_indices = self._suggest_ts_candidates(
+                mean_tensor=mean_tensor,
+                std_tensor=std_tensor,
+                batch_size=self.batch_size,
+                maximize=self._maximize
+            )
         else:
             raise ValueError("acquisition_function must be either 'ucb' or 'ei'.")
 
@@ -176,7 +182,7 @@ class TFSampler(BaseSampler):
         self._tensor_eval = np.full(self._shape, np.nan)
         self._tensor_eval_bool = np.zeros(self._shape, dtype=bool)
         self._evaluated_indices = []
-        self._maximize = StudyDirection.MAXIMIZE
+        self._maximize = study.direction == StudyDirection.MAXIMIZE
 
     def _update_tensor(self, study):
         trials = study.get_trials(deepcopy=False)
@@ -216,30 +222,6 @@ class TFSampler(BaseSampler):
             filepath = os.path.join(self.save_dir, f"{name}_trial{trial_index}.npy")
             np.save(filepath, tensor)
             print(f"Saved {name} for trial {trial_index} at {filepath}")
-
-    # def _fit(
-    #     self,
-    #     tensor_eval: np.ndarray,
-    #     tensor_eval_bool: np.ndarray,
-    # ) -> tuple[np.ndarray, np.ndarray]:
-    #     eval_mean, eval_std = self._calculate_eval_stats(
-    #         tensor_eval
-    #     )
-
-    #     tensors_list = [
-    #         self._decompose_with_optional_mask(
-    #             tensor_eval,
-    #             tensor_eval_bool,
-    #             eval_mean,
-    #             eval_std,
-    #             self._maximize
-    #         )
-    #         for _ in range(self.decomp_iter_num)
-    #     ]
-
-    #     return self._calculate_mean_std_tensors(
-    #         tensors_list, tensor_eval, tensor_eval_bool, self._maximize
-    #     )
 
     def _fit(
         self,
@@ -366,21 +348,6 @@ class TFSampler(BaseSampler):
             condition = tensor_eval_bool
         init_tensor_eval[condition] = standardized_tensor_eval[condition]
 
-        # # Incorporate constraint based on method
-        # if self._tensor_constraint is not None:
-        #     if self.fill_constraint_method == "zero":
-        #         # Fill constrained values with zeros
-        #         init_tensor_eval[self._tensor_constraint == 0] = 0.0
-        #     if self.fill_constraint_method == "normal":
-        #         # Fill constrained values with random normal samples
-        #         init_tensor_eval[self._tensor_constraint == 0] = self.rng.normal(0, 1, np.sum(self._tensor_constraint == 0))
-        #     elif self.fill_constraint_method == "minmax":
-        #         # Fill constrained values based on min/max
-        #         if maximize:
-        #             init_tensor_eval[self._tensor_constraint == 0] = np.nanmin(init_tensor_eval) - 1.0
-        #         else:
-        #             init_tensor_eval[self._tensor_constraint == 0] = np.nanmax(init_tensor_eval) + 1.0
-
         if maximize:
             init_tensor_eval[self._tensor_constraint == 0] = np.nanmin(init_tensor_eval) - 1.0
         else:
@@ -397,6 +364,7 @@ class TFSampler(BaseSampler):
             method=self.method,
             mask=torch.tensor(mask_tensor, dtype=self.torch_dtype),
             constraint=constraint,
+            is_maximize_c=maximize,
             device=self.torch_device,
         )
         tf.optimize(
@@ -497,6 +465,34 @@ class TFSampler(BaseSampler):
         # Get indices of top EI values
         flat_indices = np.argsort(ei_values.flatten())[::-1]
         top_indices = np.unravel_index(flat_indices[:batch_size], ei_values.shape)
+        top_indices = list(zip(*top_indices))
+
+        return top_indices
+
+    def _suggest_ts_candidates(
+        self,
+        mean_tensor: np.ndarray,
+        std_tensor: np.ndarray,
+        batch_size: int,
+        maximize: bool,
+    ) -> list[tuple[int, ...]]:
+        # Define TS calculation
+
+        def _ts(mean_tensor, std_tensor, maximize=True) -> np.ndarray:
+            if maximize:
+                ts_values = mean_tensor + std_tensor
+            else:
+                ts_values = -mean_tensor + std_tensor
+            return ts_values
+
+        ts_values = _ts(mean_tensor, std_tensor, maximize)
+
+        if self.unique_sampling:
+            ts_values[self._tensor_eval_bool == True] = -np.inf
+
+        # Get indices of top TS values
+        flat_indices = np.argsort(ts_values.flatten())[::-1]
+        top_indices = np.unravel_index(flat_indices[:batch_size], ts_values.shape)
         top_indices = list(zip(*top_indices))
 
         return top_indices

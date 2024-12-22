@@ -60,14 +60,16 @@ def run_bo(settings):
         objective_with_args = partial(objective, map_shape=map_shape, objective_function=objective_function, function=function)
     else:
         raise ValueError(f"Unsupported function type: {function}")
+    
+    acqf = settings["acqf_settings"]["acquisition_function"]
 
     sampler = TFSampler(
         seed=settings["seed"],
         method=settings["tf_settings"]["method"],
-        acquisition_function=settings["acqf_settings"]["acquisition_function"],
+        acquisition_function=acqf,
         sampler_params={
             "n_startup_trials": settings["sampler_settings"].get("n_startup_trials", 1),
-            "decomp_iter_num": settings["sampler_settings"].get("decomp_iter_num", 10),
+            "decomp_iter_num": settings["sampler_settings"].get("decomp_iter_num", 10) if acqf != "ts" else 1,
             "mask_ratio": settings["sampler_settings"].get("mask_ratio", 0.9),
             "include_observed_points": settings["sampler_settings"].get("include_observed_points", False),
             "unique_sampling": settings["sampler_settings"].get("unique_sampling", False),
@@ -79,7 +81,6 @@ def run_bo(settings):
             "tol": settings["tf_settings"]["optim_params"]["tol"],
             "reg_lambda": settings["tf_settings"]["optim_params"]["reg_lambda"],
             "constraint_lambda": settings["tf_settings"]["optim_params"]["constraint_lambda"],
-            # "fill_constraint_method": settings["tf_settings"]["optim_params"]["fill_constraint_method"],
         },
         acqf_params={
             "trade_off_param": settings["acqf_settings"]["trade_off_param"],
@@ -148,7 +149,7 @@ def parse_args():
     parser.add_argument("--n_startup_trials", type=int, default=1)
 
     # Acquisition function arguments
-    parser.add_argument("--acquisition_function", type=str, choices=["ucb", "ei"], default="ucb")
+    parser.add_argument("--acquisition_function", type=str, choices=["ucb", "ei", "ts"], default="ucb")
     parser.add_argument("--acq_trade_off_param", type=float, default=1.0)
 
     # Save directory
@@ -199,7 +200,6 @@ if __name__ == "__main__":
                 "tol": args.tf_tol,
                 "reg_lambda": args.tf_reg_lambda,
                 "constraint_lambda": args.tf_constraint_lambda,
-                # "fill_constraint_method": args.tf_fill_method,
             }
         },
         "acqf_settings": {

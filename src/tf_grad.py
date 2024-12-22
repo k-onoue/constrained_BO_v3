@@ -3,7 +3,16 @@ import torch.optim as optim
 
 
 class TensorFactorization:
-    def __init__(self, tensor, rank, method="cp", mask=None, constraint=None, device=None):
+    def __init__(
+        self, 
+        tensor, 
+        rank, 
+        method="cp", 
+        mask=None, 
+        constraint=None,  
+        is_maximize_c=True,
+        device=None
+    ):
         if device is None:
             device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
         self.device = device
@@ -24,6 +33,8 @@ class TensorFactorization:
         self.tensor = tensor
         self.mask = mask
         self.constraint = constraint
+        self.is_maximize_c = is_maximize_c
+
         self.method = method.lower()
 
         self.total_params = 0  # Initialize total_params
@@ -141,7 +152,9 @@ class TensorFactorization:
                 error_term = self.constraint * self.mask * (self.tensor - reconstruction)
                 mse_loss = torch.norm(error_term) ** 2 / n_se if n_se > 0 else 0
                 
-                violation_term = torch.clamp((1 - self.constraint) * (reconstruction - self.tensor), min=0)
+                sign = 1 if self.is_maximize_c else -1
+
+                violation_term = torch.clamp((1 - self.constraint) * sign * (reconstruction - self.tensor), min=0)
                 constraint_loss = constraint_lambda * torch.sum(violation_term) / n_c
                 
                 l2_loss = sum(torch.norm(factor) ** 2 / torch.numel(factor) for factor in params)
