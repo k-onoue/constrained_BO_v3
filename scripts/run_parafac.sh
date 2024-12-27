@@ -60,7 +60,7 @@ cp "$0" "$results_dir"
 # Experiment parameters
 functions=("warcraft")
 dimensions=(4)
-map_options=(1)
+map_options=(2)
 seed_list=(0 1 2 3 4 5 6 7 8 9)
 iter_bo=2000
 
@@ -71,7 +71,7 @@ cp_mask_ratio=0.9
 decomp_num=10
 
 # Acquisition function parameters
-acquisition_function="ts"
+acquisition_function="ei"
 acq_trade_off_param=1.0
 acq_batch_size=1
 acq_maximize=false

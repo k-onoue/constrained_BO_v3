@@ -61,22 +61,22 @@ cp "$0" "$results_dir"
 
 # Experiment configurations
 map_options=(1)
-# seed_list=(0 1 2 3 4 5 6 7 8 9)
-seed_list=(0 1)
+seed_list=(0 1 2 3 4 5 6 7 8 9)
+# seed_list=(0)
 
 # Algorithm parameters
 tf_methods=("cp")
 tf_ranks=(3)
-acquisition_function="ts"
-mask_ratio=0.9
+acquisition_function="ucb"
+mask_ratio=1
 tf_max_iter="None"
 
 # Flags and other settings
 constraint=false
 direction=false
-decomp_parallel=true
+decomp_parallel=false
 n_startup_trials=1
-iter_bo=500
+iter_bo=2000
 
 # Run experiments
 for map_option in "${map_options[@]}"; do

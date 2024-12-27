@@ -338,6 +338,8 @@ class TFSampler(BaseSampler):
                 tensor_eval.shape, tensor_eval_bool
             )
             mask_tensor = self._create_mask_tensor(tensor_eval.shape, mask_indices)
+        else:
+            mask_tensor = self._create_mask_tensor(tensor_eval.shape, [])
 
         init_tensor_eval = self.rng.normal(0, 1, tensor_eval.shape)
 
