@@ -10,3 +10,4 @@ send*.sh
 images/
 temp/
 optuna/
+params/*
