@@ -29,9 +29,9 @@ run_experiment() {
         --tf_lr 0.01
         --tf_tol 1e-6
         --tf_reg_lambda 0
-        --tf_constraint_lambda 3.0
+        --tf_constraint_lambda 1.0
         # Sampler parameters
-        --decomp_iter_num 10
+        --decomp_iter_num 1
         --mask_ratio "$mask_ratio"
         --n_startup_trials "$n_startup_trials"
         # Acquisition function parameters
@@ -64,8 +64,8 @@ seed_list=(0 1 2 3 4 5 6 7 8 9)
 # Algorithm parameters
 tf_methods=("cp")
 tf_ranks=(3)
-acquisition_function="ucb"
-mask_ratio=1
+acquisition_function="ts"
+mask_ratio=0.9
 tf_max_iter="None"
 
 # Flags and other settings

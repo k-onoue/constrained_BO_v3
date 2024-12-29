@@ -78,7 +78,7 @@ class TensorFactorization:
         # Attempt to load previous state if provided
         if prev_state is not None:
             self._load_state(prev_state)
-            print("Loaded from prev state!")
+            # print("Loaded from prev state!")
 
         # For logging
         self.loss = None

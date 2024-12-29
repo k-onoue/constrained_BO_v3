@@ -292,7 +292,8 @@ class TFContinualSampler(BaseSampler):
                 cand_indices = np.argwhere(tensor_eval_bool == False)
 
         # Determine the mask size
-        mask_size = max(1, int(len(cand_indices) * self.mask_ratio))
+        # mask_size = max(1, int(len(cand_indices) * self.mask_ratio))
+        mask_size = max(0, int(len(cand_indices) * self.mask_ratio))
 
         # Select mask indices randomly
         selected_indices = self.rng.choice(len(cand_indices), mask_size, replace=False)
@@ -410,6 +411,7 @@ class TFContinualSampler(BaseSampler):
 
         # Handle constraints (if any)
         if self._tensor_constraint is not None:
+            
             std_tensor[self._tensor_constraint == 0] = 0
 
         # Save for debugging
