@@ -397,7 +397,6 @@ class TFContinualSampler(BaseSampler):
             const_tol=1e-1,
             reg_lambda=self.reg_lambda,
             constraint_lambda=self.constraint_lambda,
-            verbose=False,
         )
 
         _epoch = tf.loss_history["epoch"]
