@@ -15,6 +15,7 @@ class TensorFactorization:
         is_maximize_c=True,
         device=None,
         prev_state=None,   # Added for continual learning
+        verbose=False
     ):
         if device is None:
             device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
@@ -105,8 +106,11 @@ class TensorFactorization:
             "l2": [],
         }
 
-        logging.info(f"Initialized {method} decomposition with rank {rank} on device {self.device}.")
-        logging.info(f"Total parameters: {self.total_params}")
+        # Verbosity
+        self.verbose = verbose
+        if self.verbose:
+            logging.info(f"Initialized {method} decomposition with rank {rank} on device {self.device}.")
+            logging.info(f"Total parameters: {self.total_params}")
 
     def _load_state(self, prev_state):
         """
@@ -202,8 +206,7 @@ class TensorFactorization:
         mse_tol=1e-1, 
         const_tol=1e-1, 
         reg_lambda=0.0, 
-        constraint_lambda=1, 
-        verbose=True
+        constraint_lambda=1
     ):
         """
         Perform optimization for the specified decomposition method.
@@ -276,24 +279,24 @@ class TensorFactorization:
             self.loss_history["constraint"].append(c_loss.item())
             self.loss_history["l2"].append(l2_loss.item())
 
-            if verbose:
+            if self.verbose:
                 logging.info(f"Iter: {iteration}, Loss: {loss.item()}")
                 logging.info(f"MSE: {mse_loss.item()}, CONST: {c_loss.item()}, L2: {l2_loss.item()}")
 
             # Check for MSE and constraint convergence
             if mse_loss < mse_tol and c_loss < const_tol:
-                if verbose:
+                if self.verbose:
                     logging.info("Converged based on MSE and constraint tolerance.")
                 break
 
             # Check for total loss difference
             if abs(prev_loss - loss.item()) < tol:
-                if verbose:
+                if self.verbose:
                     logging.info("Converged based on total loss tolerance.")
                 break
 
             if max_iter is not None and iteration >= max_iter - 1:
-                if verbose:
+                if self.verbose:
                     logging.info("Reached max iteration limit.")
                 break
 
