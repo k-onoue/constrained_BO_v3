@@ -31,7 +31,7 @@ run_experiment() {
         --tf_reg_lambda 0
         --tf_constraint_lambda 1.0
         # Sampler parameters
-        --decomp_iter_num 1
+        --decomp_iter_num 10
         --mask_ratio "$mask_ratio"
         --n_startup_trials "$n_startup_trials"
         # Acquisition function parameters
@@ -62,17 +62,17 @@ map_options=(1)
 seed_list=(0 1 2 3 4 5 6 7 8 9)
 
 # Algorithm parameters
-tf_methods=("cp")
-tf_ranks=(3)
-acquisition_function="ts"
-mask_ratio=0.9
+tf_methods=("train")
+tf_ranks=(2)
+acquisition_function="ei"
+mask_ratio=1
 tf_max_iter="None"
 
 # Flags and other settings
-constraint=false
+constraint=true
 direction=false
 n_startup_trials=1
-iter_bo=2000
+iter_bo=20
 
 # Run experiments
 for map_option in "${map_options[@]}"; do

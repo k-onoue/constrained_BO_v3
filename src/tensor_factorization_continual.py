@@ -1,3 +1,5 @@
+import logging
+
 import torch
 import torch.optim as optim
 
@@ -56,14 +58,22 @@ class TensorFactorization:
             self.total_params = self.core.numel() + sum(factor.numel() for factor in self.factors)
 
         elif self.method == "train":
-            self.ranks = rank if isinstance(rank, list) else [rank] * (len(tensor.shape) + 1)
+            # Automatically expand rank to [1, rank, ..., rank, 1] if rank is int
+            if isinstance(rank, int):
+                rank = [1] + [rank] * (len(tensor.shape) - 1) + [1]
+
+            self.ranks = rank
             assert self.ranks[0] == self.ranks[-1] == 1, "Tensor Train ranks must start and end with 1."
+            assert len(self.ranks) == len(tensor.shape) + 1, \
+                "Ranks length must be equal to tensor dimensions + 1."
+            
             self.factors = [
                 torch.randn(self.ranks[i], tensor.shape[i], self.ranks[i + 1], 
                             requires_grad=True, device=self.device)
                 for i in range(len(tensor.shape))
             ]
             self.total_params = sum(factor.numel() for factor in self.factors)
+
 
         elif self.method == "ring":
             self.rank = rank
@@ -87,8 +97,16 @@ class TensorFactorization:
         self.l2_loss = None
         self.iter_end = None
 
-        # print(f"Initialized {method} decomposition with rank {rank} on device {self.device}.")
-        # print(f"Total parameters: {self.total_params}")
+        self.loss_history = {
+            "epoch": [],
+            "total": [],
+            "mse": [],
+            "constraint": [],
+            "l2": [],
+        }
+
+        logging.info(f"Initialized {method} decomposition with rank {rank} on device {self.device}.")
+        logging.info(f"Total parameters: {self.total_params}")
 
     def _load_state(self, prev_state):
         """
@@ -185,7 +203,7 @@ class TensorFactorization:
         const_tol=1e-1, 
         reg_lambda=0.0, 
         constraint_lambda=1, 
-        verbose=False
+        verbose=True
     ):
         """
         Perform optimization for the specified decomposition method.
@@ -234,7 +252,7 @@ class TensorFactorization:
                 constraint_loss = constraint_lambda * torch.sum(violation_term) / n_c
 
                 # L2 regularization
-                l2_loss = 0.0
+                l2_loss = torch.tensor(0., device=self.device, dtype=mse_loss.dtype)
                 for p in params:
                     l2_loss += torch.norm(p) ** 2 / p.numel()
                 l2_loss *= reg_lambda
@@ -252,25 +270,31 @@ class TensorFactorization:
             self.constraint_loss = c_loss
             self.l2_loss = l2_loss
 
+            self.loss_history["epoch"].append(iteration+1)
+            self.loss_history["total"].append(loss.item())
+            self.loss_history["mse"].append(mse_loss.item())
+            self.loss_history["constraint"].append(c_loss.item())
+            self.loss_history["l2"].append(l2_loss.item())
+
             if verbose:
-                print(f"Iter: {iteration}, Loss: {loss.item()}")
-                print(f"MSE: {mse_loss.item()}, CONST: {c_loss.item()}, L2: {l2_loss.item()}")
+                logging.info(f"Iter: {iteration}, Loss: {loss.item()}")
+                logging.info(f"MSE: {mse_loss.item()}, CONST: {c_loss.item()}, L2: {l2_loss.item()}")
 
             # Check for MSE and constraint convergence
             if mse_loss < mse_tol and c_loss < const_tol:
                 if verbose:
-                    print("Converged based on MSE and constraint tolerance.")
+                    logging.info("Converged based on MSE and constraint tolerance.")
                 break
 
             # Check for total loss difference
             if abs(prev_loss - loss.item()) < tol:
                 if verbose:
-                    print("Converged based on total loss tolerance.")
+                    logging.info("Converged based on total loss tolerance.")
                 break
 
             if max_iter is not None and iteration >= max_iter - 1:
                 if verbose:
-                    print("Reached max iteration limit.")
+                    logging.info("Reached max iteration limit.")
                 break
 
             prev_loss = loss.item()

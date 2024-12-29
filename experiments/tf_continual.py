@@ -99,6 +99,17 @@ def run_bo(settings):
     )
 
     study.optimize(objective_with_args, n_trials=settings["iter_bo"])
+
+    # Save loss history
+    import csv
+    history_dict = sampler.loss_history
+    rows = [dict(zip(history_dict.keys(), row_data))
+            for row_data in zip(*history_dict.values())]
+    filepath = os.path.join(settings["results_dir"], f"{settings['name']}_loss_history.csv")
+    with open(filepath, "w") as f:
+        writer = csv.DictWriter(f, fieldnames=history_dict.keys())
+        writer.writeheader()
+        writer.writerows(rows)
     
     if function == "warcraft":
         best_x = np.empty(map_shape, dtype=object)
@@ -189,6 +200,7 @@ if __name__ == "__main__":
         "map": map_targeted,
         "iter_bo": args.iter_bo,
         "storage": storage_url,
+        "results_dir": results_dir,
         "plot_save_dir": args.plot_save_dir,
         "tf_settings": {
             "method": args.tf_method,

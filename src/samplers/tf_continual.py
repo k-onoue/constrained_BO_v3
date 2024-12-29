@@ -79,6 +79,17 @@ class TFContinualSampler(BaseSampler):
         self.std_tensor = None
         self.save_dir = None
 
+        # Loss tracking
+        self.loss_history = {
+            "trial": [],
+            "tf_index": [],
+            "epoch": [],
+            "total": [],
+            "mse": [],
+            "constraint": [],
+            "l2": [],
+        }
+
     def infer_relative_search_space(self, study, trial):
         search_space = optuna.search_space.intersection_search_space(
             study.get_trials(deepcopy=False)
@@ -116,6 +127,11 @@ class TFContinualSampler(BaseSampler):
             self._tensor_eval,
             self._tensor_eval_bool
         )
+
+        # Update Loss History
+        prev_len = len(self.loss_history["trial"])
+        current_len = len(self.loss_history["epoch"])
+        self.loss_history["trial"].extend([trial.number] * (current_len - prev_len))
 
         # Suggest next indices based on the selected acquisition function
         if self.acquisition_function == "ucb":
@@ -383,6 +399,19 @@ class TFContinualSampler(BaseSampler):
             constraint_lambda=self.constraint_lambda,
             verbose=False,
         )
+
+        _epoch = tf.loss_history["epoch"]
+        _total = tf.loss_history["total"]
+        _mse = tf.loss_history["mse"]
+        _constraint = tf.loss_history["constraint"]
+        _l2 = tf.loss_history["l2"]
+        
+        self.loss_history["tf_index"].extend([tf_index] * len(_epoch))
+        self.loss_history["epoch"].extend(_epoch)
+        self.loss_history["total"].extend(_total)
+        self.loss_history["mse"].extend(_mse)
+        self.loss_history["constraint"].extend(_constraint)
+        self.loss_history["l2"].extend(_l2)
      
         if self.method == "tucker":
             self._model_states[tf_index] = (tf.core, tf.factors)
