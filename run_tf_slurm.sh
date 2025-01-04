@@ -25,7 +25,7 @@ COMMON_ARGS=(
     --acquisition_function "ei"
     --map_option 2
     --tf_method train
-    --tf_rank 3
+    --tf_rank 4
 )
 
 # Optional parameters
