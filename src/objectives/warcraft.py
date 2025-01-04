@@ -170,11 +170,11 @@ class WarcraftObjective:
         ############################################################
         ############################################################
         ############################################################
-        if self._tensor_constraint is not None:
-            directions_list = list(self._val_mask_dict.keys())
-            sequence = tuple(directions_list.index(direction) for direction in direction_matrix.flatten())
-            if not self._tensor_constraint[sequence]:
-                return 10
+        # if self._tensor_constraint is not None:
+        #     directions_list = list(self._val_mask_dict.keys())
+        #     sequence = tuple(directions_list.index(direction) for direction in direction_matrix.flatten())
+        #     if not self._tensor_constraint[sequence]:
+        #         return 10
 
         # Create a mask where "oo" is 0 and other directions are 1
         mask = np.where(direction_matrix == "oo", 0, 1)

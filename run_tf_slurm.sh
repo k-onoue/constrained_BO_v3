@@ -21,11 +21,11 @@ COMMON_ARGS=(
     --acq_trade_off_param 1.0
     --mask_ratio 1
     --n_startup_trials 1
-    --iter_bo 20
+    --iter_bo 2000
     --acquisition_function "ei"
-    --map_option 1
+    --map_option 2
     --tf_method train
-    --tf_rank 2
+    --tf_rank 3
 )
 
 # Optional parameters
