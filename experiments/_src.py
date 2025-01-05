@@ -19,6 +19,7 @@ from src.samplers.parafac_nonneg import NonnegParafacSampler
 from src.samplers.tucker import TuckerSampler
 from src.samplers.tf import TFSampler
 from src.samplers.tf_continual import TFContinualSampler
+from src.samplers.tf_continual_v2 import TFContinualSamplerV2
 from src.utils_experiments import set_logger, parse_experiment_path
 
 
@@ -34,6 +35,7 @@ __all__ = [
     "TuckerSampler",
     "TFSampler",
     "TFContinualSampler",
+    "TFContinualSamplerV2",
     "set_logger",
     "parse_experiment_path",
     "ParafacSamplerV2",
