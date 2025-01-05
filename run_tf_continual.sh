@@ -58,8 +58,9 @@ mkdir -p "$results_dir" "$plot_save_dir"
 cp "$0" "$results_dir"
 
 # Experiment configurations
-map_options=(2)
-seed_list=(0 1 2 3 4 5 6 7 8 9)
+map_options=(1)
+# seed_list=(0 1 2 3 4 5 6 7 8 9)
+seed_list=(0)
 
 # Algorithm parameters
 tf_methods=("train")

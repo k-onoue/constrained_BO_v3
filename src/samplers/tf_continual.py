@@ -90,6 +90,11 @@ class TFContinualSampler(BaseSampler):
             "l2": [],
         }
 
+        # Track consecutive trials without improvement
+        self.best_params = None
+        self.no_improvement_counter = 0
+        self.no_improvement_threshold = 50  # Set your threshold here
+
     def infer_relative_search_space(self, study, trial):
         search_space = optuna.search_space.intersection_search_space(
             study.get_trials(deepcopy=False)
@@ -112,6 +117,11 @@ class TFContinualSampler(BaseSampler):
         
         states = (TrialState.COMPLETE,)
         trials = study._get_trials(deepcopy=False, states=states, use_cache=True)
+
+        if self.best_params == study.best_params:
+            self.no_improvement_counter += 1
+        else:
+            self.best_params = study.best_params
         
         if len(trials) < self.n_startup_trials:
             return {}
@@ -375,8 +385,12 @@ class TFContinualSampler(BaseSampler):
         constraint = None
         if self._tensor_constraint is not None:
             constraint = torch.tensor(self._tensor_constraint, dtype=self.torch_dtype)
-
-        prev_state = self._model_states[tf_index]
+        
+        if self.no_improvement_counter >= self.no_improvement_threshold:
+            prev_state = None
+            self.no_improvement_counter = 0
+        else:
+            prev_state = self._model_states[tf_index]
 
         tf = TensorFactorization(
             tensor=torch.tensor(init_tensor_eval, dtype=self.torch_dtype),
