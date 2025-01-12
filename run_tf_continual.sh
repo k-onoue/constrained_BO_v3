@@ -70,7 +70,7 @@ mask_ratio=1
 tf_max_iter=10000
 
 # Flags and other settings
-constraint=true
+constraint=false
 direction=false
 n_startup_trials=1
 iter_bo=500

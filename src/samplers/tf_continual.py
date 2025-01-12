@@ -258,6 +258,8 @@ class TFContinualSampler(BaseSampler):
         """
         eval_mean, eval_std = self._calculate_eval_stats(tensor_eval)
 
+        random_tensor = np.random.uniform(0, 1, size=tensor_eval.shape)
+
         # We'll build up multiple reconstructions:
         tensors_list = []
 
@@ -270,7 +272,8 @@ class TFContinualSampler(BaseSampler):
                 eval_mean=eval_mean,
                 eval_std=eval_std,
                 maximize=self._maximize,
-                tf_index=tf_index
+                tf_index=tf_index,
+                random_tensor=random_tensor,
             )
 
             tensors_list.append(decomposed_tensor)
@@ -343,6 +346,7 @@ class TFContinualSampler(BaseSampler):
         eval_std: float,
         maximize: bool,
         tf_index: int = None,
+        random_tensor = None,
     ) -> np.ndarray:
         """
         Create a masked tensor (if needed), initialize or load from prev_state,
@@ -383,11 +387,13 @@ class TFContinualSampler(BaseSampler):
         if maximize:
             # If maximizing, we can push constraint==0 to a lower value
             if self._tensor_constraint is not None:
-                init_tensor_eval[self._tensor_constraint == 0] = np.nanmin(init_tensor_eval) - 1.0
+                init_tensor_eval[self._tensor_constraint == 0] = np.nanmin(init_tensor_eval)
+                init_tensor_eval[self._tensor_constraint == 0] -= random_tensor[self._tensor_constraint == 0]
         else:
             # If minimizing, push constraint==0 to a higher value
             if self._tensor_constraint is not None:
-                init_tensor_eval[self._tensor_constraint == 0] = np.nanmax(init_tensor_eval) + 1.0
+                init_tensor_eval[self._tensor_constraint == 0] = np.nanmax(init_tensor_eval)
+                init_tensor_eval[self._tensor_constraint == 0] += random_tensor[self._tensor_constraint == 0]
 
         # Convert to Torch
         constraint = None
