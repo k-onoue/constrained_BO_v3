@@ -59,12 +59,12 @@ cp "$0" "$results_dir"
 
 # Experiment configurations
 map_options=(1)
-# seed_list=(0 1 2 3 4 5 6 7 8 9)
-seed_list=(0)
+seed_list=(0 1 2 3 4 5 6 7 8 9)
+# seed_list=(0)
 
 # Algorithm parameters
 tf_methods=("train")
-tf_ranks=(5)
+tf_ranks=(3)
 acquisition_function="ei"
 mask_ratio=1
 tf_max_iter="None"
@@ -86,7 +86,6 @@ for map_option in "${map_options[@]}"; do
                     "$tf_max_iter" "$n_startup_trials" "$iter_bo" \
                     "$acquisition_function" "$mask_ratio" &
                 
-                wait
             done
             wait
         done
