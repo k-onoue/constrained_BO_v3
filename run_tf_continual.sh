@@ -65,12 +65,12 @@ seed_list=(0 1 2 3 4 5 6 7 8 9)
 # Algorithm parameters
 tf_methods=("train")
 tf_ranks=(3)
-acquisition_function="ei"
+acquisition_function="ucb"
 mask_ratio=1
 tf_max_iter=10000
 
 # Flags and other settings
-constraint=false
+constraint=true
 direction=false
 n_startup_trials=1
 iter_bo=500
