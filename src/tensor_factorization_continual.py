@@ -229,12 +229,14 @@ class TensorFactorization:
         else:
             params = self.factors
 
-        # optimizer = optim.Adam(params, lr=lr)
+        optimizer = optim.Adam(params, lr=lr)
         # optimizer = optim.Adam(params, lr=lr, weight_decay=0.01)
-        optimizer = optim.SGD(params, lr=lr)
+        # optimizer = optim.SGD(params, lr=lr)
         # optimizer = optim.SGD(params, lr=lr, momentum=0.01)
         prev_loss = float('inf')
         iteration = 0
+
+        min_iter = 10
 
         while True:
             optimizer.zero_grad()
@@ -287,18 +289,18 @@ class TensorFactorization:
                 logging.info(f"MSE: {mse_loss.item()}, CONST: {c_loss.item()}, L2: {l2_loss.item()}")
 
             # Check for MSE and constraint convergence
-            if mse_loss < mse_tol and c_loss < const_tol:
+            if mse_loss < mse_tol and c_loss < const_tol and iteration > min_iter:
                 if self.verbose:
                     logging.info("Converged based on MSE and constraint tolerance.")
                 break
 
             # Check for total loss difference
-            if abs(prev_loss - loss.item()) < tol:
+            if abs(prev_loss - loss.item()) < tol and iteration > min_iter:
                 if self.verbose:
                     logging.info("Converged based on total loss tolerance.")
                 break
 
-            if max_iter is not None and iteration >= max_iter - 1:
+            if max_iter is not None and iteration >= max_iter - 1 and iteration > min_iter:
                 if self.verbose:
                     logging.info("Reached max iteration limit.")
                 break
