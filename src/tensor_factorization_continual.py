@@ -229,8 +229,9 @@ class TensorFactorization:
         else:
             params = self.factors
 
-        optimizer = optim.Adam(params, lr=lr)
+        # optimizer = optim.Adam(params, lr=lr)
         # optimizer = optim.Adam(params, lr=lr, weight_decay=0.01)
+        optimizer = optim.SGD(params, lr=lr)
         # optimizer = optim.SGD(params, lr=lr, momentum=0.01)
         prev_loss = float('inf')
         iteration = 0
