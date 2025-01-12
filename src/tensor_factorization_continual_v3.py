@@ -206,9 +206,7 @@ class TensorFactorization:
         mse_tol=1e-1, 
         const_tol=1e-1, 
         reg_lambda=0.0, 
-        constraint_lambda=1,
-        thr_violation=None,
-        thr_non_violation=None,
+        constraint_lambda=1
     ):
         """
         Perform optimization for the specified decomposition method.
@@ -250,24 +248,11 @@ class TensorFactorization:
                 mse_loss = torch.norm(error_term) ** 2 / n_se if n_se > 0 else 0
 
                 sign = 1 if self.is_maximize_c else -1
-                # violation_term = torch.clamp(
-                #     (1 - self.constraint) * sign * (reconstruction - self.tensor),
-                #     min=0
-                # )
-                # thr = y_best - 0.1 if self.is_maximize_c else y_best + 0.1
-                # thr_violation = 0
                 violation_term = torch.clamp(
-                    (1 - self.constraint) * sign * (reconstruction - thr_violation),
+                    (1 - self.constraint) * sign * (reconstruction - self.tensor),
                     min=0
                 )
                 constraint_loss = constraint_lambda * torch.sum(violation_term) / n_c
-                
-                non_violation_term = torch.clamp(
-                    (self.constraint) * sign * (thr_non_violation - reconstruction),
-                    min=0
-                ) 
-                if torch.sum(self.constraint) > 0:
-                    constraint_loss += constraint_lambda * torch.sum(non_violation_term) / torch.sum(self.constraint)
 
                 # L2 regularization
                 l2_loss = torch.tensor(0., device=self.device, dtype=mse_loss.dtype)
