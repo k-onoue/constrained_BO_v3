@@ -12,7 +12,7 @@ from scipy.stats import norm
 from sklearn.preprocessing import PowerTransformer
 
 
-from ..tensor_factorization_continual import TensorFactorization
+from ..tensor_factorization_continual_v2 import TensorFactorization
 
 
 class TFContinualSampler(BaseSampler):
@@ -357,12 +357,6 @@ class TFContinualSampler(BaseSampler):
         standardized_tensor_eval = (tensor_eval - eval_mean) / (eval_std + 1e-8)
         standardized_tensor_eval[~tensor_eval_bool] = np.nan  # unobserved
 
-        # self.standardized_f_best = None
-        # if maximize:
-        #     self.standardized_f_best = np.nanmax(standardized_tensor_eval)
-        # else:
-        #     self.standardized_f_best = np.nanmin(standardized_tensor_eval)
-
         # Create mask if needed
         if self.mask_ratio != 0:
             mask_indices = self._select_mask_indices(tensor_eval.shape, tensor_eval_bool)
@@ -495,46 +489,6 @@ class TFContinualSampler(BaseSampler):
         top_indices = list(zip(*top_indices))
         return top_indices
 
-    # def _suggest_ei_candidates(
-    #     self,
-    #     mean_tensor: np.ndarray,
-    #     std_tensor: np.ndarray,
-    #     batch_size: int,
-    #     maximize: bool,
-    # ) -> list[tuple[int, ...]]:
-        
-    #     # Yeo-Johnson transformation for mean
-    #     def _apply_yeo_johnson(mean_tensor):
-    #         pt = PowerTransformer(method="yeo-johnson", standardize=False)
-    #         mean_tensor = pt.fit_transform(mean_tensor.reshape(-1, 1)).reshape(mean_tensor.shape)
-    #         return mean_tensor
-        
-    #     mean_tensor = _apply_yeo_johnson(mean_tensor)
-
-    #     def _ei(mean_tensor, std_tensor, f_best, maximize=True) -> np.ndarray:
-    #         std_tensor = np.clip(std_tensor, 1e-9, None)
-    #         if maximize:
-    #             z = (mean_tensor - f_best) / std_tensor
-    #         else:
-    #             z = (f_best - mean_tensor) / std_tensor
-    #         ei_values = std_tensor * (z * norm.cdf(z) + norm.pdf(z))
-    #         return ei_values
-
-    #     if maximize:
-    #         f_best = np.nanmax(self._tensor_eval)
-    #     else:
-    #         f_best = np.nanmin(self._tensor_eval)
-
-    #     ei_values = _ei(mean_tensor, std_tensor, f_best, maximize)
-
-    #     if self.unique_sampling:
-    #         ei_values[self._tensor_eval_bool == True] = -np.inf if maximize else np.inf
-
-    #     flat_indices = np.argsort(ei_values.flatten())[::-1]  # descending
-    #     top_indices = np.unravel_index(flat_indices[:batch_size], ei_values.shape)
-    #     top_indices = list(zip(*top_indices))
-    #     return top_indices
-
     def _suggest_ei_candidates(
         self,
         mean_tensor: np.ndarray,
@@ -543,14 +497,14 @@ class TFContinualSampler(BaseSampler):
         maximize: bool,
     ) -> list[tuple[int, ...]]:
         
-        # Yeo-Johnson transformation for mean
-        def _apply_yeo_johnson(mean_tensor):
-            pt = PowerTransformer(method="yeo-johnson", standardize=False)
-            mean_tensor = pt.fit_transform(mean_tensor.reshape(-1, 1)).reshape(mean_tensor.shape)
-            self.trained_transformer = pt  # Save the transformer for later use
-            return mean_tensor
+        # # Yeo-Johnson transformation for mean
+        # def _apply_yeo_johnson(mean_tensor):
+        #     pt = PowerTransformer(method="yeo-johnson", standardize=False)
+        #     mean_tensor = pt.fit_transform(mean_tensor.reshape(-1, 1)).reshape(mean_tensor.shape)
+        #     return mean_tensor
         
-        mean_tensor = _apply_yeo_johnson(mean_tensor)
+        # mean_tensor = _apply_yeo_johnson(mean_tensor)
+
 
         def _ei(mean_tensor, std_tensor, f_best, maximize=True) -> np.ndarray:
             std_tensor = np.clip(std_tensor, 1e-9, None)
@@ -561,20 +515,10 @@ class TFContinualSampler(BaseSampler):
             ei_values = std_tensor * (z * norm.cdf(z) + norm.pdf(z))
             return ei_values
 
-        # if maximize:
-        #     f_best = np.nanmax(self._tensor_eval)
-        # else:
-        #     f_best = np.nanmin(self._tensor_eval)
-
-        standardized__tensor_eval = (self._tensor_eval - np.nanmean(self._tensor_eval)) / (np.nanstd(self._tensor_eval) + 1e-8)
         if maximize:
-            f_best = np.nanmax(standardized__tensor_eval)
+            f_best = np.nanmax(self._tensor_eval)
         else:
-            f_best = np.nanmin(standardized__tensor_eval)
-
-        # Apply Yeo-Johnson transformation to f_best
-        if hasattr(self, "trained_transformer"):  # Use trained transformer if available
-            f_best = self.trained_transformer.transform(np.array([[f_best]])).item()
+            f_best = np.nanmin(self._tensor_eval)
 
         ei_values = _ei(mean_tensor, std_tensor, f_best, maximize)
 

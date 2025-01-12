@@ -67,7 +67,7 @@ tf_methods=("train")
 tf_ranks=(3)
 acquisition_function="ei"
 mask_ratio=1
-tf_max_iter="None"
+tf_max_iter=10000
 
 # Flags and other settings
 constraint=true

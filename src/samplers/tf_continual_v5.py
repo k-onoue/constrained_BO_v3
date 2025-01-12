@@ -385,14 +385,16 @@ class TFContinualSampler(BaseSampler):
 
         init_tensor_eval[condition] = standardized_tensor_eval[condition]
 
-        if maximize:
-            # If maximizing, we can push constraint==0 to a lower value
-            if self._tensor_constraint is not None:
-                init_tensor_eval[self._tensor_constraint == 0] = np.nanmin(init_tensor_eval) - 1.0
-        else:
-            # If minimizing, push constraint==0 to a higher value
-            if self._tensor_constraint is not None:
-                init_tensor_eval[self._tensor_constraint == 0] = np.nanmax(init_tensor_eval) + 1.0
+        mask_tensor = np.logical_and(mask_tensor, 1-condition)
+
+        # if maximize:
+        #     # If maximizing, we can push constraint==0 to a lower value
+        #     if self._tensor_constraint is not None:
+        #         init_tensor_eval[self._tensor_constraint == 0] = np.nanmin(init_tensor_eval) - 1.0
+        # else:
+        #     # If minimizing, push constraint==0 to a higher value
+        #     if self._tensor_constraint is not None:
+        #         init_tensor_eval[self._tensor_constraint == 0] = np.nanmax(init_tensor_eval) + 1.0
 
         # Convert to Torch
         constraint = None
@@ -420,10 +422,15 @@ class TFContinualSampler(BaseSampler):
             lr=self.lr,
             max_iter=self.max_iter,
             tol=self.tol,
-            mse_tol=1e-3,
+            mse_tol=1e-1,
             const_tol=1e-1,
             reg_lambda=self.reg_lambda,
             constraint_lambda=self.constraint_lambda,
+            y_best=float(np.nanmax(tensor_eval)) if maximize else float(np.nanmin(tensor_eval)),
+            # y_best=float(np.nanmin(tensor_eval)) if maximize else float(np.nanmax(tensor_eval)),
+            # y_best=0,
+            thr_violation = float(np.nanmax(tensor_eval)) if maximize else float(np.nanmin(tensor_eval)),
+            thr_non_violation = float(np.nanmin(tensor_eval)) if maximize else float(np.nanmax(tensor_eval)),
         )
 
         _epoch = tf.loss_history["epoch"]
@@ -491,6 +498,9 @@ class TFContinualSampler(BaseSampler):
             else:
                 f_best = np.nanmin(self._tensor_eval)
                 return np.mean(np.maximum(f_best - recon_tensor_stacked, 0), axis=0)
+            
+        for recon_tensor in recon_tensor_list:
+            recon_tensor[self._tensor_eval_bool] = self._tensor_eval[self._tensor_eval_bool]
 
         recon_tensor_stacked = np.stack(recon_tensor_list)
         ei_values = _mc_ei(recon_tensor_stacked, maximize)

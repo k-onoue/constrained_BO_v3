@@ -12,7 +12,7 @@ from scipy.stats import norm
 from sklearn.preprocessing import PowerTransformer
 
 
-from ..tensor_factorization_continual import TensorFactorization
+from ..tensor_factorization_continual_v3 import TensorFactorization
 
 
 class TFContinualSampler(BaseSampler):
@@ -135,7 +135,7 @@ class TFContinualSampler(BaseSampler):
         self._update_tensor(study)
 
         # Perform decomposition and suggest next parameter set
-        mean_tensor, std_tensor = self._fit(
+        recon_tensor_list = self._fit(
             self._tensor_eval,
             self._tensor_eval_bool
         )
@@ -145,31 +145,40 @@ class TFContinualSampler(BaseSampler):
         current_len = len(self.loss_history["epoch"])
         self.loss_history["trial"].extend([trial.number] * (current_len - prev_len))
 
-        # Suggest next indices based on the selected acquisition function
-        if self.acquisition_function == "ucb":
-            next_indices = self._suggest_ucb_candidates(
-                mean_tensor=mean_tensor,
-                std_tensor=std_tensor,
-                trade_off_param=self.trade_off_param,
-                batch_size=self.batch_size,
-                maximize=self._maximize,
-            )
-        elif self.acquisition_function == "ei":
+        if self.acquisition_function == "ei":
             next_indices = self._suggest_ei_candidates(
-                mean_tensor=mean_tensor,
-                std_tensor=std_tensor,
-                batch_size=self.batch_size,
+                mean_tensor=None,
+                std_tensor=None,
+                batch_size=1,
                 maximize=self._maximize,
+                recon_tensor_list=recon_tensor_list
             )
-        elif self.acquisition_function == "ts":
-            next_indices = self._suggest_ts_candidates(
-                mean_tensor=mean_tensor,
-                std_tensor=std_tensor,
-                batch_size=self.batch_size,
-                maximize=self._maximize
-            )
-        else:
-            raise ValueError("acquisition_function must be 'ucb', 'ei', or 'ts'.")
+
+        # # Suggest next indices based on the selected acquisition function
+        # if self.acquisition_function == "ucb":
+        #     next_indices = self._suggest_ucb_candidates(
+        #         mean_tensor=mean_tensor,
+        #         std_tensor=std_tensor,
+        #         trade_off_param=self.trade_off_param,
+        #         batch_size=self.batch_size,
+        #         maximize=self._maximize,
+        #     )
+        # elif self.acquisition_function == "ei":
+        #     next_indices = self._suggest_ei_candidates(
+        #         mean_tensor=mean_tensor,
+        #         std_tensor=std_tensor,
+        #         batch_size=self.batch_size,
+        #         maximize=self._maximize,
+        #     )
+        # elif self.acquisition_function == "ts":
+        #     next_indices = self._suggest_ts_candidates(
+        #         mean_tensor=mean_tensor,
+        #         std_tensor=std_tensor,
+        #         batch_size=self.batch_size,
+        #         maximize=self._maximize
+        #     )
+        # else:
+        #     raise ValueError("acquisition_function must be 'ucb', 'ei', or 'ts'.")
 
         next_index = next_indices[0]
 
@@ -275,12 +284,14 @@ class TFContinualSampler(BaseSampler):
 
             tensors_list.append(decomposed_tensor)
 
-        # After collecting all reconstructions, compute final mean/std
-        return self._calculate_mean_std_tensors(
-            tensors_list,
-            tensor_eval,
-            tensor_eval_bool
-        )
+        return tensors_list
+
+        # # After collecting all reconstructions, compute final mean/std
+        # return self._calculate_mean_std_tensors(
+        #     tensors_list,
+        #     tensor_eval,
+        #     tensor_eval_bool
+        # )
 
     def _calculate_eval_stats(
         self, tensor_eval: np.ndarray
@@ -409,7 +420,7 @@ class TFContinualSampler(BaseSampler):
             lr=self.lr,
             max_iter=self.max_iter,
             tol=self.tol,
-            mse_tol=1e-1,
+            mse_tol=1e-3,
             const_tol=1e-1,
             reg_lambda=self.reg_lambda,
             constraint_lambda=self.constraint_lambda,
@@ -463,63 +474,26 @@ class TFContinualSampler(BaseSampler):
         self.std_tensor = std_tensor
 
         return mean_tensor, std_tensor
-
-    def _suggest_ucb_candidates(
-        self,
-        mean_tensor: np.ndarray,
-        std_tensor: np.ndarray,
-        trade_off_param: float,
-        batch_size: int,
-        maximize: bool,
-    ) -> list[tuple[int, ...]]:
-        def _ucb(mean_tensor, std_tensor, trade_off_param, maximize=True) -> np.ndarray:
-            if maximize:
-                return mean_tensor + trade_off_param * std_tensor
-            else:
-                return -mean_tensor + trade_off_param * std_tensor
-
-        ucb_values = _ucb(mean_tensor, std_tensor, trade_off_param, maximize)
-
-        if self.unique_sampling:
-            ucb_values[self._tensor_eval_bool == True] = -np.inf if maximize else np.inf
-
-        # Get indices of top UCB values
-        flat_indices = np.argsort(ucb_values.flatten())[::-1]  # descending
-        top_indices = np.unravel_index(flat_indices[:batch_size], ucb_values.shape)
-        top_indices = list(zip(*top_indices))
-        return top_indices
-
+    
     def _suggest_ei_candidates(
         self,
         mean_tensor: np.ndarray,
         std_tensor: np.ndarray,
         batch_size: int,
         maximize: bool,
+        recon_tensor_list = None
     ) -> list[tuple[int, ...]]:
         
-        # Yeo-Johnson transformation for mean
-        def _apply_yeo_johnson(mean_tensor):
-            pt = PowerTransformer(method="yeo-johnson", standardize=False)
-            mean_tensor = pt.fit_transform(mean_tensor.reshape(-1, 1)).reshape(mean_tensor.shape)
-            return mean_tensor
-        
-        mean_tensor = _apply_yeo_johnson(mean_tensor)
-
-        def _ei(mean_tensor, std_tensor, f_best, maximize=True) -> np.ndarray:
-            std_tensor = np.clip(std_tensor, 1e-9, None)
+        def _mc_ei(recon_tensor_stacked, maximize=True) -> np.ndarray:
             if maximize:
-                z = (mean_tensor - f_best) / std_tensor
+                f_best = np.nanmax(self._tensor_eval)
+                return np.mean(np.maximum(recon_tensor_stacked - f_best, 0), axis=0)
             else:
-                z = (f_best - mean_tensor) / std_tensor
-            ei_values = std_tensor * (z * norm.cdf(z) + norm.pdf(z))
-            return ei_values
+                f_best = np.nanmin(self._tensor_eval)
+                return np.mean(np.maximum(f_best - recon_tensor_stacked, 0), axis=0)
 
-        if maximize:
-            f_best = np.nanmax(self._tensor_eval)
-        else:
-            f_best = np.nanmin(self._tensor_eval)
-
-        ei_values = _ei(mean_tensor, std_tensor, f_best, maximize)
+        recon_tensor_stacked = np.stack(recon_tensor_list)
+        ei_values = _mc_ei(recon_tensor_stacked, maximize)
 
         if self.unique_sampling:
             ei_values[self._tensor_eval_bool == True] = -np.inf if maximize else np.inf
@@ -529,29 +503,94 @@ class TFContinualSampler(BaseSampler):
         top_indices = list(zip(*top_indices))
         return top_indices
 
-    def _suggest_ts_candidates(
-        self,
-        mean_tensor: np.ndarray,
-        std_tensor: np.ndarray,
-        batch_size: int,
-        maximize: bool,
-    ) -> list[tuple[int, ...]]:
-        """
-        Thompson Sampling approach can be more involved, but here is a naive version
-        using mean + std (for maximize) or -(mean - std) (for minimize).
-        """
-        def _ts(mean_tensor, std_tensor, maximize=True) -> np.ndarray:
-            if maximize:
-                return mean_tensor + std_tensor
-            else:
-                return -mean_tensor + std_tensor
+    # def _suggest_ucb_candidates(
+    #     self,
+    #     mean_tensor: np.ndarray,
+    #     std_tensor: np.ndarray,
+    #     trade_off_param: float,
+    #     batch_size: int,
+    #     maximize: bool,
+    # ) -> list[tuple[int, ...]]:
+    #     def _ucb(mean_tensor, std_tensor, trade_off_param, maximize=True) -> np.ndarray:
+    #         if maximize:
+    #             return mean_tensor + trade_off_param * std_tensor
+    #         else:
+    #             return -mean_tensor + trade_off_param * std_tensor
 
-        ts_values = _ts(mean_tensor, std_tensor, maximize)
+    #     ucb_values = _ucb(mean_tensor, std_tensor, trade_off_param, maximize)
 
-        if self.unique_sampling:
-            ts_values[self._tensor_eval_bool == True] = -np.inf if maximize else np.inf
+    #     if self.unique_sampling:
+    #         ucb_values[self._tensor_eval_bool == True] = -np.inf if maximize else np.inf
 
-        flat_indices = np.argsort(ts_values.flatten())[::-1]  # descending
-        top_indices = np.unravel_index(flat_indices[:batch_size], ts_values.shape)
-        top_indices = list(zip(*top_indices))
-        return top_indices
+    #     # Get indices of top UCB values
+    #     flat_indices = np.argsort(ucb_values.flatten())[::-1]  # descending
+    #     top_indices = np.unravel_index(flat_indices[:batch_size], ucb_values.shape)
+    #     top_indices = list(zip(*top_indices))
+    #     return top_indices
+    
+    # def _suggest_ei_candidates(
+    #     self,
+    #     mean_tensor: np.ndarray,
+    #     std_tensor: np.ndarray,
+    #     batch_size: int,
+    #     maximize: bool,
+    # ) -> list[tuple[int, ...]]:
+        
+    #     # Yeo-Johnson transformation for mean
+    #     def _apply_yeo_johnson(mean_tensor):
+    #         pt = PowerTransformer(method="yeo-johnson", standardize=False)
+    #         mean_tensor = pt.fit_transform(mean_tensor.reshape(-1, 1)).reshape(mean_tensor.shape)
+    #         return mean_tensor
+        
+    #     mean_tensor = _apply_yeo_johnson(mean_tensor)
+
+    #     def _ei(mean_tensor, std_tensor, f_best, maximize=True) -> np.ndarray:
+    #         std_tensor = np.clip(std_tensor, 1e-9, None)
+    #         if maximize:
+    #             z = (mean_tensor - f_best) / std_tensor
+    #         else:
+    #             z = (f_best - mean_tensor) / std_tensor
+    #         ei_values = std_tensor * (z * norm.cdf(z) + norm.pdf(z))
+    #         return ei_values
+
+    #     if maximize:
+    #         f_best = np.nanmax(self._tensor_eval)
+    #     else:
+    #         f_best = np.nanmin(self._tensor_eval)
+
+    #     ei_values = _ei(mean_tensor, std_tensor, f_best, maximize)
+
+    #     if self.unique_sampling:
+    #         ei_values[self._tensor_eval_bool == True] = -np.inf if maximize else np.inf
+
+    #     flat_indices = np.argsort(ei_values.flatten())[::-1]  # descending
+    #     top_indices = np.unravel_index(flat_indices[:batch_size], ei_values.shape)
+    #     top_indices = list(zip(*top_indices))
+    #     return top_indices
+
+    # def _suggest_ts_candidates(
+    #     self,
+    #     mean_tensor: np.ndarray,
+    #     std_tensor: np.ndarray,
+    #     batch_size: int,
+    #     maximize: bool,
+    # ) -> list[tuple[int, ...]]:
+    #     """
+    #     Thompson Sampling approach can be more involved, but here is a naive version
+    #     using mean + std (for maximize) or -(mean - std) (for minimize).
+    #     """
+    #     def _ts(mean_tensor, std_tensor, maximize=True) -> np.ndarray:
+    #         if maximize:
+    #             return mean_tensor + std_tensor
+    #         else:
+    #             return -mean_tensor + std_tensor
+
+    #     ts_values = _ts(mean_tensor, std_tensor, maximize)
+
+    #     if self.unique_sampling:
+    #         ts_values[self._tensor_eval_bool == True] = -np.inf if maximize else np.inf
+
+    #     flat_indices = np.argsort(ts_values.flatten())[::-1]  # descending
+    #     top_indices = np.unravel_index(flat_indices[:batch_size], ts_values.shape)
+    #     top_indices = list(zip(*top_indices))
+    #     return top_indices
