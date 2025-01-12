@@ -619,8 +619,9 @@ class TFContinualSampler(BaseSampler):
             else:
                 z = (f_best - mean_tensor) / std_tensor
             # ei_values = std_tensor * (z * norm.cdf(z) + norm.pdf(z))
-            n = np.sum(self._tensor_eval_bool)
-            n = n if n > 1 else 2
+            # n = np.sum(self._tensor_eval_bool)
+            # n = n if n > 1 else 2
+            n = 10 # decomp iter num
             ei_values = std_tensor * (z * t.cdf(z, df=n-1) + t.pdf(z, df=n-1))
             return ei_values
 
