@@ -10,6 +10,7 @@ from optuna.study import StudyDirection
 from optuna.trial import TrialState
 from scipy.stats import norm
 from sklearn.preprocessing import PowerTransformer
+from scipy.stats import t
 
 
 from ..tensor_factorization_continual import TensorFactorization
@@ -543,6 +544,57 @@ class TFContinualSampler(BaseSampler):
     #     top_indices = list(zip(*top_indices))
     #     return top_indices
 
+    # def _suggest_ei_candidates(
+    #     self,
+    #     mean_tensor: np.ndarray,
+    #     std_tensor: np.ndarray,
+    #     batch_size: int,
+    #     maximize: bool,
+    # ) -> list[tuple[int, ...]]:
+        
+    #     # # Yeo-Johnson transformation for mean
+    #     # def _apply_yeo_johnson(mean_tensor):
+    #     #     pt = PowerTransformer(method="yeo-johnson", standardize=False)
+    #     #     mean_tensor = pt.fit_transform(mean_tensor.reshape(-1, 1)).reshape(mean_tensor.shape)
+    #     #     self.trained_transformer = pt  # Save the transformer for later use
+    #     #     return mean_tensor
+        
+    #     # mean_tensor = _apply_yeo_johnson(mean_tensor)
+
+    #     def _ei(mean_tensor, std_tensor, f_best, maximize=True) -> np.ndarray:
+    #         std_tensor = np.clip(std_tensor, 1e-9, None)
+    #         if maximize:
+    #             z = (mean_tensor - f_best) / std_tensor
+    #         else:
+    #             z = (f_best - mean_tensor) / std_tensor
+    #         ei_values = std_tensor * (z * norm.cdf(z) + norm.pdf(z))
+    #         return ei_values
+
+    #     # if maximize:
+    #     #     f_best = np.nanmax(self._tensor_eval)
+    #     # else:
+    #     #     f_best = np.nanmin(self._tensor_eval)
+
+    #     standardized__tensor_eval = (self._tensor_eval - np.nanmean(self._tensor_eval)) / (np.nanstd(self._tensor_eval) + 1e-8)
+    #     if maximize:
+    #         f_best = np.nanmax(standardized__tensor_eval)
+    #     else:
+    #         f_best = np.nanmin(standardized__tensor_eval)
+
+    #     # # Apply Yeo-Johnson transformation to f_best
+    #     # if hasattr(self, "trained_transformer"):  # Use trained transformer if available
+    #     #     f_best = self.trained_transformer.transform(np.array([[f_best]])).item()
+
+    #     ei_values = _ei(mean_tensor, std_tensor, f_best, maximize)
+
+    #     if self.unique_sampling:
+    #         ei_values[self._tensor_eval_bool == True] = -np.inf if maximize else np.inf
+
+    #     flat_indices = np.argsort(ei_values.flatten())[::-1]  # descending
+    #     top_indices = np.unravel_index(flat_indices[:batch_size], ei_values.shape)
+    #     top_indices = list(zip(*top_indices))
+    #     return top_indices
+
     def _suggest_ei_candidates(
         self,
         mean_tensor: np.ndarray,
@@ -566,7 +618,10 @@ class TFContinualSampler(BaseSampler):
                 z = (mean_tensor - f_best) / std_tensor
             else:
                 z = (f_best - mean_tensor) / std_tensor
-            ei_values = std_tensor * (z * norm.cdf(z) + norm.pdf(z))
+            # ei_values = std_tensor * (z * norm.cdf(z) + norm.pdf(z))
+            n = np.sum(self._tensor_eval_bool)
+            n = n if n > 1 else 2
+            ei_values = std_tensor * (z * t.cdf(z, df=n-1) + t.pdf(z, df=n-1))
             return ei_values
 
         # if maximize:
