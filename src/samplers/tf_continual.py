@@ -339,6 +339,118 @@ class TFContinualSampler(BaseSampler):
             mask_tensor[tuple(mask_index)] = False
         return mask_tensor
 
+    # def _decompose_with_optional_mask(
+    #     self,
+    #     tensor_eval: np.ndarray,
+    #     tensor_eval_bool: np.ndarray,
+    #     eval_mean: float,
+    #     eval_std: float,
+    #     maximize: bool,
+    #     tf_index: int = None,
+    #     random_tensor = None,
+    # ) -> np.ndarray:
+    #     """
+    #     Create a masked tensor (if needed), initialize or load from prev_state,
+    #     do factorization, return the reconstructed tensor as a NumPy array.
+
+    #     If you want to store factor parameters for continual learning, you can:
+    #       - Modify TensorFactorization to return its factors in e.g. a get_state() method,
+    #       - Return (reconstructed_tensor, factor_params) here,
+    #       - Save factor_params to self._model_states[tf_index].
+    #     """
+    #     # Standardize
+    #     standardized_tensor_eval = (tensor_eval - eval_mean) / (eval_std + 1e-8)
+    #     standardized_tensor_eval[~tensor_eval_bool] = np.nan  # unobserved
+
+    #     # self.standardized_f_best = None
+    #     # if maximize:
+    #     #     self.standardized_f_best = np.nanmax(standardized_tensor_eval)
+    #     # else:
+    #     #     self.standardized_f_best = np.nanmin(standardized_tensor_eval)
+
+    #     # Create mask if needed
+    #     if self.mask_ratio != 0:
+    #         mask_indices = self._select_mask_indices(tensor_eval.shape, tensor_eval_bool)
+    #         mask_tensor = self._create_mask_tensor(tensor_eval.shape, mask_indices)
+    #     else:
+    #         mask_tensor = self._create_mask_tensor(tensor_eval.shape, [])
+
+    #     # Initialize values
+    #     init_tensor_eval = self.rng.normal(0, 1, tensor_eval.shape)
+
+    #     if self._tensor_constraint is not None:
+    #         condition = np.logical_and(tensor_eval_bool, self._tensor_constraint)
+    #     else:
+    #         condition = tensor_eval_bool
+
+    #     init_tensor_eval[condition] = standardized_tensor_eval[condition]
+
+    #     if maximize:
+    #         # If maximizing, we can push constraint==0 to a lower value
+    #         if self._tensor_constraint is not None:
+    #             init_tensor_eval[self._tensor_constraint == 0] = np.nanmin(init_tensor_eval)
+    #             # init_tensor_eval[self._tensor_constraint == 0] -= random_tensor[self._tensor_constraint == 0]
+    #             init_tensor_eval[self._tensor_constraint == 0] -= 1
+    #     else:
+    #         # If minimizing, push constraint==0 to a higher value
+    #         if self._tensor_constraint is not None:
+    #             init_tensor_eval[self._tensor_constraint == 0] = np.nanmax(init_tensor_eval)
+    #             # init_tensor_eval[self._tensor_constraint == 0] += random_tensor[self._tensor_constraint == 0]
+    #             init_tensor_eval[self._tensor_constraint == 0] += 1
+
+    #     # Convert to Torch
+    #     constraint = None
+    #     if self._tensor_constraint is not None:
+    #         constraint = torch.tensor(self._tensor_constraint, dtype=self.torch_dtype)
+        
+    #     if self.no_improvement_counter >= self.no_improvement_threshold:
+    #         prev_state = None
+    #         self.no_improvement_counter = 0
+    #     else:
+    #         prev_state = self._model_states[tf_index]
+
+    #     tf = TensorFactorization(
+    #         tensor=torch.tensor(init_tensor_eval, dtype=self.torch_dtype),
+    #         rank=self.rank,
+    #         method=self.method,
+    #         mask=torch.tensor(mask_tensor, dtype=self.torch_dtype),
+    #         constraint=constraint,
+    #         is_maximize_c=maximize,
+    #         device=self.torch_device,
+    #         prev_state=prev_state,  # pass the previously saved factors
+    #     )
+
+    #     tf.optimize(
+    #         lr=self.lr,
+    #         max_iter=self.max_iter,
+    #         tol=self.tol,
+    #         mse_tol=1e-1,
+    #         const_tol=1e-1,
+    #         reg_lambda=self.reg_lambda,
+    #         constraint_lambda=self.constraint_lambda,
+    #     )
+
+    #     _epoch = tf.loss_history["epoch"]
+    #     _total = tf.loss_history["total"]
+    #     _mse = tf.loss_history["mse"]
+    #     _constraint = tf.loss_history["constraint"]
+    #     _l2 = tf.loss_history["l2"]
+        
+    #     self.loss_history["tf_index"].extend([tf_index] * len(_epoch))
+    #     self.loss_history["epoch"].extend(_epoch)
+    #     self.loss_history["total"].extend(_total)
+    #     self.loss_history["mse"].extend(_mse)
+    #     self.loss_history["constraint"].extend(_constraint)
+    #     self.loss_history["l2"].extend(_l2)
+     
+    #     if self.method == "tucker":
+    #         self._model_states[tf_index] = (tf.core, tf.factors)
+    #     else:
+    #         self._model_states[tf_index] = tf.factors
+
+    #     reconstructed_tensor = tf.reconstruct()
+    #     return reconstructed_tensor.detach().cpu().numpy()
+
     def _decompose_with_optional_mask(
         self,
         tensor_eval: np.ndarray,
@@ -375,6 +487,8 @@ class TFContinualSampler(BaseSampler):
         else:
             mask_tensor = self._create_mask_tensor(tensor_eval.shape, [])
 
+        mask_tensor = np.logical_or(mask_tensor, self._tensor_constraint == 0)
+
         # Initialize values
         init_tensor_eval = self.rng.normal(0, 1, tensor_eval.shape)
 
@@ -384,19 +498,6 @@ class TFContinualSampler(BaseSampler):
             condition = tensor_eval_bool
 
         init_tensor_eval[condition] = standardized_tensor_eval[condition]
-
-        if maximize:
-            # If maximizing, we can push constraint==0 to a lower value
-            if self._tensor_constraint is not None:
-                init_tensor_eval[self._tensor_constraint == 0] = np.nanmin(init_tensor_eval)
-                # init_tensor_eval[self._tensor_constraint == 0] -= random_tensor[self._tensor_constraint == 0]
-                init_tensor_eval[self._tensor_constraint == 0] -= 1
-        else:
-            # If minimizing, push constraint==0 to a higher value
-            if self._tensor_constraint is not None:
-                init_tensor_eval[self._tensor_constraint == 0] = np.nanmax(init_tensor_eval)
-                # init_tensor_eval[self._tensor_constraint == 0] += random_tensor[self._tensor_constraint == 0]
-                init_tensor_eval[self._tensor_constraint == 0] += 1
 
         # Convert to Torch
         constraint = None
@@ -619,9 +720,9 @@ class TFContinualSampler(BaseSampler):
             else:
                 z = (f_best - mean_tensor) / std_tensor
             # ei_values = std_tensor * (z * norm.cdf(z) + norm.pdf(z))
-            # n = np.sum(self._tensor_eval_bool)
-            # n = n if n > 1 else 2
-            n = 10 # decomp iter num
+            n = np.sum(self._tensor_eval_bool)
+            n = n if n > 1 else 2
+            # n = 10 # decomp iter num
             ei_values = std_tensor * (z * t.cdf(z, df=n-1) + t.pdf(z, df=n-1))
             return ei_values
 
