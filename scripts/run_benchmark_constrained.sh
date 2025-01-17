@@ -45,13 +45,14 @@ cp "$0" "$results_dir"  # Copy script for reproducibility
 # General experiment parameters
 iter_bo=2000
 n_startup_trials=1
-n_init_violation_paths=200  # Number of initial violation paths
+n_init_violation_paths=1000  # Number of initial violation paths
 
 # Experiment configurations
-sampler_list=("tpe" "gp")
+# sampler_list=("tpe" "gp")
+sampler_list=("tpe")
 functions=("warcraft")
 dimensions=(4)
-map_options=(1 2 3)
+map_options=(1 2)
 seed_list=(0 1 2 3 4 5 6 7 8 9) 
 
 # Main experiment loop
