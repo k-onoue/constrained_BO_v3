@@ -92,11 +92,6 @@ class TFContinualSampler(BaseSampler):
             "l2": [],
         }
 
-        # Track consecutive trials without improvement
-        self.best_params = None
-        self.no_improvement_counter = 0
-        self.no_improvement_threshold = 50  # Set your threshold here
-
     def infer_relative_search_space(self, study, trial):
         search_space = optuna.search_space.intersection_search_space(
             study.get_trials(deepcopy=False)
@@ -119,11 +114,6 @@ class TFContinualSampler(BaseSampler):
         
         states = (TrialState.COMPLETE,)
         trials = study._get_trials(deepcopy=False, states=states, use_cache=True)
-
-        if self.best_params == study.best_params:
-            self.no_improvement_counter += 1
-        else:
-            self.best_params = study.best_params
         
         if len(trials) < self.n_startup_trials:
             return {}
@@ -231,22 +221,6 @@ class TFContinualSampler(BaseSampler):
                     self._tensor_eval_bool[index] = True
                     self._evaluated_indices.append(index)
 
-        # Debugging (optional saving)
-        trial_num = trial.number - 1
-        if trial_num >= 1:
-            self._save_tensor(self._tensor_eval, "tensor_eval", trial_num)
-            self._save_tensor(self._tensor_eval_bool, "tensor_eval_bool", trial_num)
-            self._save_tensor(self.mean_tensor, "mean_tensor", trial_num)
-            self._save_tensor(self.std_tensor, "std_tensor", trial_num)
-
-    def _save_tensor(self, tensor: np.ndarray, name: str, trial_index: int):
-        import os
-        if self.save_dir:
-            os.makedirs(self.save_dir, exist_ok=True)
-            filepath = os.path.join(self.save_dir, f"{name}_trial{trial_index}.npy")
-            np.save(filepath, tensor)
-            print(f"Saved {name} for trial {trial_index} at {filepath}")
-
     def _fit(
         self,
         tensor_eval: np.ndarray,
@@ -338,118 +312,6 @@ class TFContinualSampler(BaseSampler):
             mask_tensor[tuple(mask_index)] = False
         return mask_tensor
 
-    # def _decompose_with_optional_mask(
-    #     self,
-    #     tensor_eval: np.ndarray,
-    #     tensor_eval_bool: np.ndarray,
-    #     eval_mean: float,
-    #     eval_std: float,
-    #     maximize: bool,
-    #     tf_index: int = None,
-    #     random_tensor = None,
-    # ) -> np.ndarray:
-    #     """
-    #     Create a masked tensor (if needed), initialize or load from prev_state,
-    #     do factorization, return the reconstructed tensor as a NumPy array.
-
-    #     If you want to store factor parameters for continual learning, you can:
-    #       - Modify TensorFactorization to return its factors in e.g. a get_state() method,
-    #       - Return (reconstructed_tensor, factor_params) here,
-    #       - Save factor_params to self._model_states[tf_index].
-    #     """
-    #     # Standardize
-    #     standardized_tensor_eval = (tensor_eval - eval_mean) / (eval_std + 1e-8)
-    #     standardized_tensor_eval[~tensor_eval_bool] = np.nan  # unobserved
-
-    #     # self.standardized_f_best = None
-    #     # if maximize:
-    #     #     self.standardized_f_best = np.nanmax(standardized_tensor_eval)
-    #     # else:
-    #     #     self.standardized_f_best = np.nanmin(standardized_tensor_eval)
-
-    #     # Create mask if needed
-    #     if self.mask_ratio != 0:
-    #         mask_indices = self._select_mask_indices(tensor_eval.shape, tensor_eval_bool)
-    #         mask_tensor = self._create_mask_tensor(tensor_eval.shape, mask_indices)
-    #     else:
-    #         mask_tensor = self._create_mask_tensor(tensor_eval.shape, [])
-
-    #     # Initialize values
-    #     init_tensor_eval = self.rng.normal(0, 1, tensor_eval.shape)
-
-    #     if self._tensor_constraint is not None:
-    #         condition = np.logical_and(tensor_eval_bool, self._tensor_constraint)
-    #     else:
-    #         condition = tensor_eval_bool
-
-    #     init_tensor_eval[condition] = standardized_tensor_eval[condition]
-
-    #     if maximize:
-    #         # If maximizing, we can push constraint==0 to a lower value
-    #         if self._tensor_constraint is not None:
-    #             init_tensor_eval[self._tensor_constraint == 0] = np.nanmin(init_tensor_eval)
-    #             # init_tensor_eval[self._tensor_constraint == 0] -= random_tensor[self._tensor_constraint == 0]
-    #             init_tensor_eval[self._tensor_constraint == 0] -= 1
-    #     else:
-    #         # If minimizing, push constraint==0 to a higher value
-    #         if self._tensor_constraint is not None:
-    #             init_tensor_eval[self._tensor_constraint == 0] = np.nanmax(init_tensor_eval)
-    #             # init_tensor_eval[self._tensor_constraint == 0] += random_tensor[self._tensor_constraint == 0]
-    #             init_tensor_eval[self._tensor_constraint == 0] += 1
-
-    #     # Convert to Torch
-    #     constraint = None
-    #     if self._tensor_constraint is not None:
-    #         constraint = torch.tensor(self._tensor_constraint, dtype=self.torch_dtype)
-        
-    #     if self.no_improvement_counter >= self.no_improvement_threshold:
-    #         prev_state = None
-    #         self.no_improvement_counter = 0
-    #     else:
-    #         prev_state = self._model_states[tf_index]
-
-    #     tf = TensorFactorization(
-    #         tensor=torch.tensor(init_tensor_eval, dtype=self.torch_dtype),
-    #         rank=self.rank,
-    #         method=self.method,
-    #         mask=torch.tensor(mask_tensor, dtype=self.torch_dtype),
-    #         constraint=constraint,
-    #         is_maximize_c=maximize,
-    #         device=self.torch_device,
-    #         prev_state=prev_state,  # pass the previously saved factors
-    #     )
-
-    #     tf.optimize(
-    #         lr=self.lr,
-    #         max_iter=self.max_iter,
-    #         tol=self.tol,
-    #         mse_tol=1e-1,
-    #         const_tol=1e-1,
-    #         reg_lambda=self.reg_lambda,
-    #         constraint_lambda=self.constraint_lambda,
-    #     )
-
-    #     _epoch = tf.loss_history["epoch"]
-    #     _total = tf.loss_history["total"]
-    #     _mse = tf.loss_history["mse"]
-    #     _constraint = tf.loss_history["constraint"]
-    #     _l2 = tf.loss_history["l2"]
-        
-    #     self.loss_history["tf_index"].extend([tf_index] * len(_epoch))
-    #     self.loss_history["epoch"].extend(_epoch)
-    #     self.loss_history["total"].extend(_total)
-    #     self.loss_history["mse"].extend(_mse)
-    #     self.loss_history["constraint"].extend(_constraint)
-    #     self.loss_history["l2"].extend(_l2)
-     
-    #     if self.method == "tucker":
-    #         self._model_states[tf_index] = (tf.core, tf.factors)
-    #     else:
-    #         self._model_states[tf_index] = tf.factors
-
-    #     reconstructed_tensor = tf.reconstruct()
-    #     return reconstructed_tensor.detach().cpu().numpy()
-
     def _decompose_with_optional_mask(
         self,
         tensor_eval: np.ndarray,
@@ -469,15 +331,27 @@ class TFContinualSampler(BaseSampler):
           - Return (reconstructed_tensor, factor_params) here,
           - Save factor_params to self._model_states[tf_index].
         """
-        # Standardize
-        standardized_tensor_eval = (tensor_eval - eval_mean) / (eval_std + 1e-8)
-        standardized_tensor_eval[~tensor_eval_bool] = np.nan  # unobserved
+        # # Standardize
+        # standardized_tensor_eval = (tensor_eval - eval_mean) / (eval_std + 1e-8)
+        # standardized_tensor_eval[~tensor_eval_bool] = np.nan  # unobserved
 
-        # self.standardized_f_best = None
-        # if maximize:
-        #     self.standardized_f_best = np.nanmax(standardized_tensor_eval)
-        # else:
-        #     self.standardized_f_best = np.nanmin(standardized_tensor_eval)
+        # Calculate nanmin and nanmax once and store them in variables
+        tensor_min = np.nanmin(tensor_eval)
+        tensor_max = np.nanmax(tensor_eval)
+
+        # Normalize tensor_eval with a fallback to 0.5 when all values are the same
+        if tensor_min == tensor_max:
+            normalized_tensor_eval = np.full_like(tensor_eval, 0.5)
+            threshold = 0.5
+        else:
+            normalized_tensor_eval = (tensor_eval - tensor_min) / (tensor_max - tensor_min)
+            
+            if maximize:
+                threshold = 0
+            else:
+                threshold = 1
+        
+        normalized_tensor_eval[~tensor_eval_bool] = np.nan  # unobserved
 
         # Create mask if needed
         if self.mask_ratio != 0:
@@ -489,25 +363,23 @@ class TFContinualSampler(BaseSampler):
         mask_tensor = np.logical_or(mask_tensor, self._tensor_constraint == 0)
 
         # Initialize values
-        init_tensor_eval = self.rng.normal(0, 1, tensor_eval.shape)
+        # init_tensor_eval = self.rng.normal(0, 1, tensor_eval.shape)
+        init_tensor_eval = self.rng.uniform(0, 1, tensor_eval.shape)
 
         if self._tensor_constraint is not None:
             condition = np.logical_and(tensor_eval_bool, self._tensor_constraint)
         else:
             condition = tensor_eval_bool
 
-        init_tensor_eval[condition] = standardized_tensor_eval[condition]
+        # init_tensor_eval[condition] = standardized_tensor_eval[condition]
+        init_tensor_eval[condition] = normalized_tensor_eval[condition]
 
         # Convert to Torch
         constraint = None
         if self._tensor_constraint is not None:
             constraint = torch.tensor(self._tensor_constraint, dtype=self.torch_dtype)
         
-        if self.no_improvement_counter >= self.no_improvement_threshold:
-            prev_state = None
-            self.no_improvement_counter = 0
-        else:
-            prev_state = self._model_states[tf_index]
+        prev_state = self._model_states[tf_index]
 
         tf = TensorFactorization(
             tensor=torch.tensor(init_tensor_eval, dtype=self.torch_dtype),
@@ -528,6 +400,7 @@ class TFContinualSampler(BaseSampler):
             const_tol=1e-1,
             reg_lambda=self.reg_lambda,
             constraint_lambda=self.constraint_lambda,
+            thr=threshold
         )
 
         _epoch = tf.loss_history["epoch"]
@@ -566,12 +439,12 @@ class TFContinualSampler(BaseSampler):
         std_tensor = np.std(tensors_stack, axis=0)
 
         mean_tensor[tensor_eval_bool] = tensor_eval[tensor_eval_bool]
-        std_tensor[tensor_eval_bool] = 0
+        std_tensor[tensor_eval_bool] = 1e-8  # small value for observed points
 
         # Handle constraints (if any)
         if self._tensor_constraint is not None:
             
-            std_tensor[self._tensor_constraint == 0] = 0
+            std_tensor[self._tensor_constraint == 0] = 1e-8
 
         # Save for debugging
         self.mean_tensor = mean_tensor
@@ -604,97 +477,6 @@ class TFContinualSampler(BaseSampler):
         top_indices = list(zip(*top_indices))
         return top_indices
 
-    # def _suggest_ei_candidates(
-    #     self,
-    #     mean_tensor: np.ndarray,
-    #     std_tensor: np.ndarray,
-    #     batch_size: int,
-    #     maximize: bool,
-    # ) -> list[tuple[int, ...]]:
-        
-    #     # Yeo-Johnson transformation for mean
-    #     def _apply_yeo_johnson(mean_tensor):
-    #         pt = PowerTransformer(method="yeo-johnson", standardize=False)
-    #         mean_tensor = pt.fit_transform(mean_tensor.reshape(-1, 1)).reshape(mean_tensor.shape)
-    #         return mean_tensor
-        
-    #     mean_tensor = _apply_yeo_johnson(mean_tensor)
-
-    #     def _ei(mean_tensor, std_tensor, f_best, maximize=True) -> np.ndarray:
-    #         std_tensor = np.clip(std_tensor, 1e-9, None)
-    #         if maximize:
-    #             z = (mean_tensor - f_best) / std_tensor
-    #         else:
-    #             z = (f_best - mean_tensor) / std_tensor
-    #         ei_values = std_tensor * (z * norm.cdf(z) + norm.pdf(z))
-    #         return ei_values
-
-    #     if maximize:
-    #         f_best = np.nanmax(self._tensor_eval)
-    #     else:
-    #         f_best = np.nanmin(self._tensor_eval)
-
-    #     ei_values = _ei(mean_tensor, std_tensor, f_best, maximize)
-
-    #     if self.unique_sampling:
-    #         ei_values[self._tensor_eval_bool == True] = -np.inf if maximize else np.inf
-
-    #     flat_indices = np.argsort(ei_values.flatten())[::-1]  # descending
-    #     top_indices = np.unravel_index(flat_indices[:batch_size], ei_values.shape)
-    #     top_indices = list(zip(*top_indices))
-    #     return top_indices
-
-    # def _suggest_ei_candidates(
-    #     self,
-    #     mean_tensor: np.ndarray,
-    #     std_tensor: np.ndarray,
-    #     batch_size: int,
-    #     maximize: bool,
-    # ) -> list[tuple[int, ...]]:
-        
-    #     # # Yeo-Johnson transformation for mean
-    #     # def _apply_yeo_johnson(mean_tensor):
-    #     #     pt = PowerTransformer(method="yeo-johnson", standardize=False)
-    #     #     mean_tensor = pt.fit_transform(mean_tensor.reshape(-1, 1)).reshape(mean_tensor.shape)
-    #     #     self.trained_transformer = pt  # Save the transformer for later use
-    #     #     return mean_tensor
-        
-    #     # mean_tensor = _apply_yeo_johnson(mean_tensor)
-
-    #     def _ei(mean_tensor, std_tensor, f_best, maximize=True) -> np.ndarray:
-    #         std_tensor = np.clip(std_tensor, 1e-9, None)
-    #         if maximize:
-    #             z = (mean_tensor - f_best) / std_tensor
-    #         else:
-    #             z = (f_best - mean_tensor) / std_tensor
-    #         ei_values = std_tensor * (z * norm.cdf(z) + norm.pdf(z))
-    #         return ei_values
-
-    #     # if maximize:
-    #     #     f_best = np.nanmax(self._tensor_eval)
-    #     # else:
-    #     #     f_best = np.nanmin(self._tensor_eval)
-
-    #     standardized__tensor_eval = (self._tensor_eval - np.nanmean(self._tensor_eval)) / (np.nanstd(self._tensor_eval) + 1e-8)
-    #     if maximize:
-    #         f_best = np.nanmax(standardized__tensor_eval)
-    #     else:
-    #         f_best = np.nanmin(standardized__tensor_eval)
-
-    #     # # Apply Yeo-Johnson transformation to f_best
-    #     # if hasattr(self, "trained_transformer"):  # Use trained transformer if available
-    #     #     f_best = self.trained_transformer.transform(np.array([[f_best]])).item()
-
-    #     ei_values = _ei(mean_tensor, std_tensor, f_best, maximize)
-
-    #     if self.unique_sampling:
-    #         ei_values[self._tensor_eval_bool == True] = -np.inf if maximize else np.inf
-
-    #     flat_indices = np.argsort(ei_values.flatten())[::-1]  # descending
-    #     top_indices = np.unravel_index(flat_indices[:batch_size], ei_values.shape)
-    #     top_indices = list(zip(*top_indices))
-    #     return top_indices
-
     def _suggest_ei_candidates(
         self,
         mean_tensor: np.ndarray,
@@ -718,27 +500,23 @@ class TFContinualSampler(BaseSampler):
                 z = (mean_tensor - f_best) / std_tensor
             else:
                 z = (f_best - mean_tensor) / std_tensor
-            # ei_values = std_tensor * (z * norm.cdf(z) + norm.pdf(z))
-            n = np.sum(self._tensor_eval_bool)
-            n = n if n > 1 else 2
-            # n = 10 # decomp iter num
-            ei_values = std_tensor * (z * t.cdf(z, df=n-1) + t.pdf(z, df=n-1))
+            ei_values = std_tensor * (z * norm.cdf(z) + norm.pdf(z))
+            # n = np.sum(self._tensor_eval_bool)
+            # n = n if n > 1 else 2
+            # # n = 10 # decomp iter num
+            # ei_values = std_tensor * (z * t.cdf(z, df=n-1) + t.pdf(z, df=n-1))
             return ei_values
 
-        # if maximize:
-        #     f_best = np.nanmax(self._tensor_eval)
-        # else:
-        #     f_best = np.nanmin(self._tensor_eval)
+        tensor_min = np.nanmin(self._tensor_eval)
+        tensor_max = np.nanmax(self._tensor_eval)
 
-        standardized__tensor_eval = (self._tensor_eval - np.nanmean(self._tensor_eval)) / (np.nanstd(self._tensor_eval) + 1e-8)
-        if maximize:
-            f_best = np.nanmax(standardized__tensor_eval)
+        if tensor_min == tensor_max:
+            f_best = 0.5
         else:
-            f_best = np.nanmin(standardized__tensor_eval)
-
-        # # Apply Yeo-Johnson transformation to f_best
-        # if hasattr(self, "trained_transformer"):  # Use trained transformer if available
-        #     f_best = self.trained_transformer.transform(np.array([[f_best]])).item()
+            if maximize:
+                f_best = 1
+            else:
+                f_best = 0
 
         ei_values = _ei(mean_tensor, std_tensor, f_best, maximize)
 
